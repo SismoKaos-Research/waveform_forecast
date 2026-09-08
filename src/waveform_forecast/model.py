@@ -69,6 +69,14 @@ class MaskedStationPool(nn.Module):
             `pooled` has shape (batch, time, dim); `weights` has shape
             (batch, time, stations) and is zero at absent stations.
         """
+        # An absent station's cells arrive as NaN from `features` (absent is
+        # NaN there, never 0, so it cannot be mistaken for an average reading).
+        # A zero WEIGHT does not neutralise them -- NaN * 0 is NaN, and one
+        # such cell turns the whole pooled vector, then the loss, then every
+        # gradient. The mask says these contribute nothing, so make that
+        # literally true before anything arithmetic touches them.
+        emb = torch.where(present.unsqueeze(-1), emb,
+                          torch.zeros((), dtype=emb.dtype, device=emb.device))
         s = self.score(emb).squeeze(-1)                       # (B, T, S)
         # -inf before the softmax, not zero after it: zeroing afterwards would
         # still let an absent station take probability mass from the present

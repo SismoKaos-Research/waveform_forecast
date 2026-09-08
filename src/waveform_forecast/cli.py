@@ -14,6 +14,8 @@ import sys
 COMMANDS = {
     "features": ("waveform_forecast.features",
                  "aggregate extractor output into one aligned hourly table"),
+    "train":    ("waveform_forecast.train",
+                 "train the multi-station forecaster against its floor"),
 }
 
 

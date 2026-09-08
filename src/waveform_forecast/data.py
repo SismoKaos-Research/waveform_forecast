@@ -1,0 +1,139 @@
+"""Windows of multi-station hourly features, standardized against the train split.
+
+Not a runnable script -- imported only.
+
+One sample is `seq_hours` consecutive hours ending at an index, shaped
+(time, stations, features), with the presence mask alongside it and the label at
+the window's last hour.
+
+**Standardization is per (station, feature) and fitted on present rows only.**
+Per-station because site response is a property of the station, not the
+earthquake -- pooling z-scores from one shared mean would make a permanently
+noisier station look permanently more active. Present rows only because an
+absent hour is NaN, and letting NaN into the mean makes every statistic NaN.
+
+**NaN is filled with 0 after standardizing, and that is safe only because of the
+mask.** Zero here means "the standardized mean", which is exactly the reading
+that would be indistinguishable from a real quiet hour -- which is why the model
+never sees these cells: `MaskedStationPool` zeroes masked embeddings before
+weighting them. The fill exists because `NaN * 0` is NaN, so a masked-out cell
+left as NaN still poisons the pooled vector and every gradient after it.
+"""
+import warnings
+
+import numpy as np
+import torch
+from torch.utils.data import Dataset
+
+
+def station_feature_columns(frame, stations):
+    """The `<STATION>__<FEATURE>` columns, per station, in one consistent order.
+
+    Returns:
+        (columns, feature_names) where `columns` is {station: [col, ...]} and
+        every station's list is the same features in the same order -- the
+        station axis is only stackable if it is.
+
+    Raises:
+        ValueError: If a station is missing from the frame, or the stations do
+            not share a feature set.
+    """
+    cols, feats = {}, None
+    for s in stations:
+        pre = f"{s}__"
+        got = [c for c in frame.columns if c.startswith(pre)]
+        if not got:
+            raise ValueError(
+                f"station {s!r} has no columns in this table; it holds "
+                f"{sorted({c.split('__')[0] for c in frame.columns if '__' in c})}")
+        names = [c[len(pre):] for c in got]
+        if feats is None:
+            feats = names
+        elif names != feats:
+            raise ValueError(
+                f"station {s!r} carries a different feature set than "
+                f"{stations[0]!r}; extract every station with the same config")
+        cols[s] = [f"{pre}{f}" for f in feats]
+    return cols, feats
+
+
+def stack(frame, stations):
+    """The frame as (hours, stations, features) plus its (hours, stations) mask."""
+    cols, feats = station_feature_columns(frame, stations)
+    x = np.stack([frame[cols[s]].to_numpy(dtype=np.float32) for s in stations], axis=1)
+    present = np.stack([frame[f"present_{s}"].to_numpy(dtype=bool) for s in stations],
+                       axis=1)
+    return x, present, feats
+
+
+def fit_stats(x, present, indices, seq_hours):
+    """Per-(station, feature) mean and std over the training windows' present hours.
+
+    Sampled across the whole training split rather than its opening rows: a
+    trailing-window feature's lookback is still filling at the start of an
+    archive, and standardizing by statistics taken there understated the true
+    spread by up to 52x in this project's single-station work -- producing
+    z-scores over 100 and a model whose best checkpoint was the untrained one.
+    """
+    take = indices[np.linspace(0, len(indices) - 1,
+                               min(500, len(indices))).astype(int)]
+    rows = np.unique(np.concatenate(
+        [np.arange(max(0, i - seq_hours + 1), i + 1) for i in take]))
+    sub, msk = x[rows], present[rows]
+    wide = np.where(msk[..., None], sub, np.nan)
+    # A station can be absent for an ENTIRE training split and that is not an
+    # error -- GCAM's archive ends 2024-12, so any later fold has none of it.
+    # nanmean of an all-NaN column is NaN with a RuntimeWarning; the identity
+    # (0, 1) is the right fill, because the mask means those cells never reach
+    # the model anyway. Silencing the warning here rather than globally keeps
+    # it meaningful everywhere else.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        mu = np.nanmean(wide, axis=0)
+        sd = np.nanstd(wide, axis=0)
+    absent = ~np.isfinite(mu).all(axis=-1)
+    if absent.any():
+        print(f"    [stats] {int(absent.sum())} station(s) absent for the whole "
+              f"training split; standardized with the identity, and masked out "
+              f"at every hour anyway")
+    mu = np.where(np.isfinite(mu), mu, 0.0).astype(np.float32)
+    sd = np.where(np.isfinite(sd) & (sd > 1e-8), sd, 1.0).astype(np.float32)
+    return mu, sd
+
+
+class MultiStationWindows(Dataset):
+    """Windows of (time, stations, features), the mask, and the label."""
+
+    def __init__(self, x, present, labels, seq_hours, indices, stats):
+        """Builds the dataset.
+
+        Args:
+            x: (hours, stations, features) float array, NaN where absent.
+            present: (hours, stations) bool array.
+            labels: (hours,) int array.
+            seq_hours: Hours per window.
+            indices: Window end-indices.
+            stats: (mu, sd) from `fit_stats` on the TRAINING split. Val and test
+                must reuse them; fitting their own would let the evaluation
+                split's distribution into the model.
+        """
+        self.x, self.present, self.labels = x, present, labels
+        self.seq_hours, self.indices = seq_hours, indices
+        self.mu, self.sd = stats
+
+    def __len__(self):
+        return len(self.indices)
+
+    def __getitem__(self, idx):
+        """Returns (window, present, label) for one sample."""
+        end = self.indices[idx]
+        start = end - self.seq_hours + 1
+        w = (self.x[start:end + 1] - self.mu) / self.sd
+        m = self.present[start:end + 1]
+        # See the module docstring: masked cells must be finite, not NaN, or
+        # `NaN * 0` in the pool takes the whole batch with it. The mask is what
+        # keeps this zero from being read as a real average reading.
+        w = np.where(m[..., None], np.nan_to_num(w, nan=0.0), 0.0)
+        return (torch.from_numpy(np.ascontiguousarray(w, dtype=np.float32)),
+                torch.from_numpy(np.ascontiguousarray(m)),
+                torch.tensor(self.labels[end], dtype=torch.float32))
