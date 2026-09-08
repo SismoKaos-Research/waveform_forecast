@@ -8,3 +8,8 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Run outputs
+runs/
+*.pth
+*.parquet

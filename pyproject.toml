@@ -1,17 +1,38 @@
 [project]
 name = "waveform-forecast"
 version = "0.1.0"
-description = "Add your description here"
+description = "Multi-station continuous forecaster: hourly waveform features or a raw CNN, same labels as catalog_mlp"
 readme = "README.md"
 authors = [
     { name = "Oguzb", email = "hoguzbolat@gmail.com" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+# obspy reads the AFAD miniSEED archives, scipy conditions the windows the way
+# the training corpus was built, and torch/pandas/sklearn are the model and its
+# evaluation. No catalogue-feature dependency: the labels come from the
+# catalogue CSV directly, as in the `forecast` repo.
+dependencies = [
+    "torch>=2.14.0",
+    "numpy>=2.0",
+    "pandas>=2.2",
+    "scikit-learn>=1.5",
+    "scipy>=1.11",
+    "obspy>=1.4",
+    "pyarrow>=15.0",
+]
 
 [project.scripts]
-waveform-forecast = "waveform_forecast:main"
+waveform-forecast = "waveform_forecast.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
 
 [build-system]
 requires = ["uv_build>=0.12.10,<0.13.0"]
 build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# The failures here are quiet ones -- a window that straddles a gap, a station
+# outage read as a quiet sensor, a label that leaks across a fold boundary.
+addopts = "-ra --strict-markers"
