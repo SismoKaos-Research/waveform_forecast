@@ -89,3 +89,44 @@ def walk_forward_splits(valid_end_indices: np.ndarray, n_folds: int, labels: np.
             blocks[i] = blocks[i][blocks[i] > cutoff]
     return [(np.concatenate(blocks[:k + 1]), blocks[k + 1], blocks[k + 2])
             for k in range(n_folds)]
+
+
+def purge_by_label_span(train_idx, val_idx, test_idx, resolves_at, quiet=False):
+    """Drops the hours whose labels could only be known from a later block.
+
+    The exact form of the purge, for labels that do not all look the same
+    distance ahead. A fixed embargo has to assume the worst case: with
+    "days to next event" that worst case is the longest gap in the catalogue --
+    183 days at M>=4.5 on this archive -- and embargoing that much of a two-year
+    record to protect the handful of hours that actually need it throws away
+    most of the data. Per hour, almost none of it is lost.
+
+    Train is purged against the start of val, and val against the start of test.
+    Test is never purged: its labels resolving after the record ends is a
+    property of the record, and hours with no resolution at all were dropped
+    upstream.
+
+    Args:
+        train_idx, val_idx, test_idx: Absolute positions into the hour grid.
+        resolves_at: From `catalog.label_resolution_index` -- the first position
+            whose data is needed to know each hour's label.
+
+    Returns:
+        (train_idx, val_idx, test_idx), purged.
+    """
+    def keep(idx, boundary):
+        if not len(idx) or boundary is None:
+            return idx
+        return idx[resolves_at[idx] <= boundary]
+
+    v0 = int(val_idx.min()) if len(val_idx) else (
+        int(test_idx.min()) if len(test_idx) else None)
+    t0 = int(test_idx.min()) if len(test_idx) else None
+    kept_tr, kept_va = keep(train_idx, v0), keep(val_idx, t0)
+    if not quiet:
+        drop_tr, drop_va = len(train_idx) - len(kept_tr), len(val_idx) - len(kept_va)
+        if drop_tr or drop_va:
+            print(f"  purged by label span: {drop_tr:,} train and {drop_va:,} val "
+                  f"hour(s) whose next event\n      falls in a later block "
+                  f"({100 * drop_tr / max(len(train_idx), 1):.1f}% of train)")
+    return kept_tr, kept_va, test_idx

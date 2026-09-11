@@ -163,6 +163,62 @@ def days_to_next_major(hourly_index: pd.DatetimeIndex, major_times: np.ndarray,
     return out, censored
 
 
+def label_resolution_index(hourly_index: pd.DatetimeIndex, major_times: np.ndarray,
+                           cap_days: float = None, feature_hours: float = 1.0):
+    """For each hour, the first grid position whose data you need to know its label.
+
+    This is what makes an UNCAPPED "days to next event" trainable without
+    leaking. A fixed embargo assumes every label looks the same distance ahead;
+    this one does not. Hour H's target is only observable once the next
+    qualifying event has happened, and that moment is different for every hour --
+    two days out during an aftershock sequence, a hundred during a quiet stretch.
+
+    So the honest purge is per hour: a training hour survives only if the event
+    that settles its label occurred before the block it is being validated
+    against begins. That is Lopez de Prado's purging by label span (Ch. 7),
+    applied exactly rather than bounded by the worst case -- which is what a
+    single `horizon` term in the embargo is.
+
+    Args:
+        hourly_index: Hour-start timestamps, sorted. Need not be contiguous;
+            `align` produces a union index with gaps in it.
+        major_times: Sorted qualifying event times.
+        cap_days: If the target is censored at a cap, a label also settles when
+            the cap elapses, whichever comes first -- a censored hour says "at
+            least this long" and that is known without waiting for the event.
+        feature_hours: Length of the feature window opening at each index.
+
+    Returns:
+        Int array of positions into `hourly_index`. Position `p` means "every
+        hour before `p` is enough"; a label that never settles inside the record
+        gets `len(hourly_index)`, i.e. no split can contain it.
+    """
+    offset = np.timedelta64(int(round(feature_hours * 3600)), "s")
+    t = hourly_index.to_numpy() + offset
+    idx = np.searchsorted(major_times, t, side="left")
+    # The string "NaT" with an explicit dtype, not `np.datetime64("NaT")`:
+    # the bare constructor carries the GENERIC unit, which numpy refuses to mix
+    # with a nanosecond timestamp rather than silently truncating it. The right
+    # refusal, and the reason this is spelled out rather than left to inference.
+    settles = np.full(len(t), "NaT", dtype=t.dtype)
+    has_next = idx < len(major_times)
+    settles[has_next] = major_times[idx[has_next]]
+    if cap_days is not None:
+        cap = np.timedelta64(int(round(cap_days * 86400)), "s")
+        # A censored hour settles at the cap even when no event ever arrives,
+        # which is the whole point of censoring: "at least 30 days" is knowable
+        # 30 days later, without waiting for an event that may never come.
+        capped = t + cap
+        settles = np.where(np.isnat(settles) | (capped < settles), capped, settles)
+    hours = hourly_index.to_numpy()
+    out = np.full(len(t), len(hours), dtype=np.int64)
+    known = ~np.isnat(settles)
+    # side="right": an event falling INSIDE hour p needs hour p, so the answer
+    # is p+1. Off by one here silently keeps the contaminated hour.
+    out[known] = np.searchsorted(hours, settles[known], side="right")
+    return out
+
+
 def label_hours_rate_change(hourly_index: pd.DatetimeIndex, rate_times: np.ndarray,
                             horizon_days: float, baseline_days: float = None):
     """Labels each hour with whether seismicity RATE will increase ("variant B").

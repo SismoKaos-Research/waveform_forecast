@@ -21,14 +21,19 @@ which is the only way the two are a comparison.
 above. `--mode regress` asks how many DAYS until the next M>=threshold event,
 censored at the same horizon:
 
-    waveform-forecast train --mode regress --horizon-days 14 ...
+    waveform-forecast train --mode regress ...
 
-The censoring is not a convenience. An uncapped "days to next" depends on an
-event arbitrarily far ahead, so a training hour near a fold boundary carries a
-label decided inside the validation block and no finite embargo removes it.
-Capping at the horizon bounds the lookahead to exactly the interval the binary
-label already uses -- which is also what makes the two modes comparable on the
-same folds rather than merely adjacent.
+**No horizon is needed for it, and none should be used lightly.** The target
+looks a different distance ahead for every hour -- two days inside an aftershock
+sequence, 183 at the longest gap in this catalogue -- so instead of embargoing
+the worst case, each hour is purged individually against the block its own next
+event falls in (Lopez de Prado Ch. 7, purging by label span). On the MANT+DEMI
+split that costs 0.9% of train where a 14-day embargo cost 336 hours.
+
+`--cap-days` censors the wait if a bounded question is wanted, but read the
+distribution first: at M>=4.5 the median wait here is 15 days, so a 14-day cap
+makes 52% of the target the cap itself and the model is mostly asked to predict
+a constant.
 
 Its floor is not 0.5 but two trivial rules in days: the training median, and
 days-to-next conditioned on days-since-previous. The second is usually much the
@@ -55,7 +60,8 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 from waveform_forecast.catalog import (days_since_prev_major,
-                                       days_to_next_major, label_hours,
+                                       days_to_next_major,
+                                       label_resolution_index, label_hours,
                                        load_aegean_events)
 from waveform_forecast.data import MultiStationWindows, fit_stats, stack
 from waveform_forecast.evaluate import (fold_result, regression_fold_result,
@@ -63,7 +69,8 @@ from waveform_forecast.evaluate import (fold_result, regression_fold_result,
 from waveform_forecast.metrics import safe_auc, safe_spearman
 from waveform_forecast.model import MultiStationForecaster
 from waveform_forecast.seeding import seed_everything
-from waveform_forecast.splits import print_split_diagnostics, walk_forward_splits
+from waveform_forecast.splits import (print_split_diagnostics,
+                                      purge_by_label_span, walk_forward_splits)
 
 NAME = "train"
 HELP = "train the multi-station forecaster and score it against its floor"
@@ -86,6 +93,15 @@ def add_args(p):
                         "horizon. Same events, same folds, same purge -- the two "
                         "are directly comparable because the censoring makes the "
                         "regression label depend on exactly the same interval.")
+    p.add_argument("--cap-days", type=float, default=None,
+                   help="regress only: censor the target at this many days, so "
+                        "an hour whose next event is further off is recorded as "
+                        '"at least this long". OPTIONAL -- the split is kept '
+                        "honest by purging each hour against the block its own "
+                        "next event falls in, not by a fixed horizon, so an "
+                        "uncapped target is fine. Cap only to ask a bounded "
+                        "question: at M>=4.5 the median wait is 15 d, so a 14 d "
+                        "cap makes 52% of the target the cap itself.")
     p.add_argument("--target-transform", default="log1p", choices=["log1p", "none"],
                    help="log1p: fit on log1p(days) and invert for reporting. The "
                         "wait distribution is heavy-tailed, and a plain squared "
@@ -176,20 +192,23 @@ def build_inputs(args):
                  f"inside the Aegean box; there is nothing to label with")
     dsp = days_since_prev_major(hour_index, major)
     if args.mode == "regress":
-        # Censored at the horizon so the label's lookahead is bounded and the
-        # walk-forward purge can remove it. See `days_to_next_major`.
-        labels, censored = days_to_next_major(hour_index, major, args.horizon_days)
+        labels, censored = days_to_next_major(hour_index, major, args.cap_days)
         n_open = int(np.isnan(labels).sum())
         if n_open:
             print(f"  {n_open:,} hour(s) past the last M>={args.threshold} event "
                   f"({major[-1]}) have no next event and are dropped —\n"
                   f"      right-censored, not quiet")
-        print(f"  {censored.sum():,} of {np.isfinite(labels).sum():,} labelled "
-              f"hour(s) wait longer than the {args.horizon_days:g} d cap "
-              f"({100 * censored.sum() / max(np.isfinite(labels).sum(), 1):.1f}%)")
-        return x, present, labels, dsp, hour_index, feats, censored
+        if args.cap_days is not None:
+            n_lab = max(int(np.isfinite(labels).sum()), 1)
+            print(f"  {censored.sum():,} of {n_lab:,} labelled hour(s) wait "
+                  f"longer than the {args.cap_days:g} d cap "
+                  f"({100 * censored.sum() / n_lab:.1f}%)")
+        # When each hour's label settles. This replaces the horizon term in the
+        # embargo: the lookahead is per hour, so the purge is too.
+        resolves = label_resolution_index(hour_index, major, args.cap_days)
+        return x, present, labels, dsp, hour_index, feats, censored, resolves
     labels = label_hours(hour_index, major, args.horizon_days)
-    return x, present, labels, dsp, hour_index, feats, None
+    return x, present, labels, dsp, hour_index, feats, None, None
 
 
 def train_one_seed(args, seed, ds_train, ds_val, ds_test, feat_dim, device):
@@ -341,10 +360,11 @@ def transform_target(labels, how):
 
 
 def run_fold(label, args, x, present, labels, dsp, hour_index, tr_i, va_i, te_i,
-             seeds, device, feat_dim, censored=None):
+             seeds, device, feat_dim, censored=None, header=True):
     """Trains the ensemble on one split and scores it against that fold's floor."""
     regress = args.mode == "regress"
-    print(f"\n{'=' * 64}\n{label}\n{'=' * 64}")
+    if header:
+        print(f"\n{'=' * 64}\n{label}\n{'=' * 64}")
     print(f"  splits (chronological): train={len(tr_i)} val={len(va_i)} test={len(te_i)}")
     for name, idx in (("train", tr_i), ("val", va_i), ("test", te_i)):
         if not len(idx):
@@ -394,14 +414,17 @@ def run_fold(label, args, x, present, labels, dsp, hour_index, tr_i, va_i, te_i,
 
 
 def run(args):
-    x, present, labels, dsp, hour_index, feats, censored = build_inputs(args)
+    x, present, labels, dsp, hour_index, feats, censored, resolves = \
+        build_inputs(args)
     n, n_st, n_feat = x.shape
     print(f"  {n:,} hourly rows, {n_st} station(s), {n_feat} feature(s) each")
     if args.mode == "regress":
         ok = np.isfinite(labels)
+        cap = (f"censored at {args.cap_days:g} d" if args.cap_days is not None
+               else "uncapped; the split is purged per hour instead")
         print(f"  wait to next M>={args.threshold}: median "
               f"{np.median(labels[ok]):.2f} d, mean {np.mean(labels[ok]):.2f} d "
-              f"(censored at {args.horizon_days:g} d)")
+              f"({cap})")
     else:
         print(f"  hourly positive rate: {labels.mean():.3f}")
     for k, s in enumerate(args.stations):
@@ -432,11 +455,19 @@ def run(args):
                                      if args.mode == "regress" else ""))
     print(f"  {len(valid):,} usable window(s) of {n - args.seq_hours + 1:,}")
 
-    # seq_hours-1 removes input overlap at a block boundary; the label looks
-    # horizon_days forward, so without the horizon term the last ~14 days of
-    # every block carry labels decided by events inside the NEXT block -- train
-    # labels encoding what happens in val (Lopez de Prado, Ch. 7).
-    embargo = args.seq_hours - 1 + int(round(args.horizon_days * 24))
+    # seq_hours-1 removes INPUT overlap at a block boundary: a window ending
+    # just inside val reads hours that belong to train.
+    #
+    # The LABEL's lookahead is handled differently by mode. In classify it is
+    # exactly horizon_days for every hour, so a constant term in the embargo is
+    # exact (Lopez de Prado, Ch. 7). In regress it is the distance to the next
+    # event, which is different for every hour -- 2 days inside an aftershock
+    # sequence, 183 at the longest gap in this catalogue. Embargoing the worst
+    # case would cost a quarter of a two-year archive to protect the few hours
+    # that need it, so those hours are purged individually instead, below.
+    embargo = args.seq_hours - 1
+    if args.mode != "regress":
+        embargo += int(round(args.horizon_days * 24))
 
     if args.cv_folds <= 1:
         i_tr = int(len(valid) * args.train_frac)
@@ -454,8 +485,15 @@ def run(args):
 
     results = []
     for name, (tr_i, va_i, te_i) in zip(names, folds):
+        if args.mode == "regress":
+            print(f"\n{'=' * 64}\n{name}\n{'=' * 64}")
+            tr_i, va_i, te_i = purge_by_label_span(tr_i, va_i, te_i, resolves)
+            if not len(tr_i) or not len(te_i):
+                print("  nothing survives the purge on this fold")
+                continue
         r = run_fold(name, args, x, present, labels, dsp, hour_index,
-                     tr_i, va_i, te_i, seeds, device, n_feat, censored)
+                     tr_i, va_i, te_i, seeds, device, n_feat, censored,
+                     header=args.mode != "regress")
         if r is not None:
             results.append(r)
     if args.cv_folds > 1:

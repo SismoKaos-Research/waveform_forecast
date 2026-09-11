@@ -383,17 +383,44 @@ def summarise_regression(results, n_folds):
     print(f"  ensemble MAE per fold: {[f'{m:.3f}' for m in maes]} d")
     print(f"  ensemble MAE:  mean {np.nanmean(maes):.3f}  std {np.nanstd(maes):.3f} d")
     print(f"  floor MAE:     mean {np.nanmean(floors):.3f}  std {np.nanstd(floors):.3f} d")
-    print(f"  Spearman per fold: {[f'{r:+.4f}' for r in rhos]}")
+    pers_rhos = np.array([r.persistence_spearman for r in results], dtype=float)
+    # A NaN model rho means the prediction was CONSTANT -- the very failure the
+    # checks below warn about -- and `nan < 0.43` is False, so comparing raw
+    # would let it through silently. Read an absent rank correlation as
+    # ordering nothing, which is what it is.
+    ranked = np.where(np.isfinite(rhos), rhos, 0.0)
+    print(f"  Spearman per fold:   {[f'{r:+.4f}' for r in rhos]}"
+          + ("   (nan = a constant prediction)" if not np.isfinite(rhos).all() else ""))
+    print(f"  persistence Spearman:{[f'{r:+.4f}' for r in pers_rhos]}")
     print(f"  beats its own fold's floor in {beat}/{len(results)} folds")
+    # MAE and rank can disagree sharply, and on this data they do: the
+    # persistence rule orders the hours well (rho ~0.43 on the MANT+DEMI split)
+    # while sitting far above the constant on absolute error, because it is
+    # badly calibrated rather than uninformative. A model can therefore clear
+    # the MAE floor -- which is min(constant, persistence) -- while ordering
+    # worse than a rule that costs nothing. Beating an error bar by being
+    # closer to the median is not a forecast.
+    out_ranked = np.sum(np.isfinite(pers_rhos) & (ranked < pers_rhos))
+    if out_ranked:
+        print(f"  [!] persistence orders the hours better in "
+              f"{int(out_ranked)}/{len(results)} fold(s). A lower MAE than the\n"
+              f"      constant floor does not make up for that -- the constant "
+              f"orders nothing at all.")
     if len(results) > 1 and np.nanstd(maes) > abs(np.nanmean(maes) - np.nanmean(floors)):
         print("  [!] fold spread exceeds the margin over the floor -- read the "
               "per-fold column,\n      not the mean. This is the condition under "
               "which a pooled number misleads.")
-    if np.nanmean(np.abs(rhos)) < 0.05:
+    # `ranked`, not `rhos`: every fold's rho can be NaN at once -- a prediction
+    # constant on every fold -- and nanmean of all-NaN is NaN with a warning,
+    # so the check would skip exactly the run that most needs it.
+    if np.mean(np.abs(ranked)) < 0.05:
         print("  [!] rank correlation is ~0 across folds: the model is not "
               "ordering the hours,\n      whatever its MAE says. An MAE near the "
               "constant floor is the base rate, not a forecast.")
     return {"mean_mae": float(np.nanmean(maes)), "std_mae": float(np.nanstd(maes)),
             "mean_floor_mae": float(np.nanmean(floors)),
-            "mean_spearman": float(np.nanmean(rhos)),
+            # `ranked` again: all-NaN rhos are a constant prediction, and
+            # returning NaN here would let a caller read "no measurement" where
+            # the measurement is that the model ordered nothing.
+            "mean_spearman": float(np.mean(ranked)),
             "folds_beating_floor": beat, "n_folds": len(results)}

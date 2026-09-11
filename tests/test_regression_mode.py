@@ -230,3 +230,21 @@ def test_the_summary_warns_when_nothing_is_being_ordered(capsys):
           for k in range(3)]
     summarise_regression(rs, 3)
     assert "not ordering the hours" in capsys.readouterr().out
+
+
+def test_the_summary_flags_a_model_that_orders_worse_than_persistence(capsys):
+    """The disagreement seen on the real MANT+DEMI split: persistence sits at
+    rho +0.43 while losing on MAE, because it is badly calibrated rather than
+    uninformative. A model clearing the MAE floor by hugging the median is not
+    a forecast, and the MAE column alone would call it a win."""
+    rng = np.random.default_rng(7)
+    y_tr = rng.uniform(0, 40, 2000)
+    dsp_tr = y_tr + rng.normal(0, 1.0, 2000)          # informative but offset
+    y_te = rng.uniform(0, 40, 2000)
+    dsp_te = y_te + rng.normal(0, 1.0, 2000)
+    flat = np.full(2000, float(np.median(y_tr)))      # orders nothing
+    rs = [regression_fold_result(f"f{k}", y_te, flat, [flat], y_tr, dsp_tr,
+                                 dsp_te, quiet=True) for k in range(2)]
+    assert rs[0].persistence_spearman > 0.8
+    summarise_regression(rs, 2)
+    assert "persistence orders the hours better" in capsys.readouterr().out
