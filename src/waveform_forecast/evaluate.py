@@ -30,7 +30,9 @@ from dataclasses import dataclass
 import numpy as np
 from sklearn.metrics import brier_score_loss
 
-from waveform_forecast.metrics import binary_report, print_report, safe_auc
+from waveform_forecast.metrics import (binary_report, print_report,
+                                       regression_report, safe_auc,
+                                       safe_spearman)
 
 
 def rate_persistence_auc(labels: np.ndarray, trailing_counts: np.ndarray) -> float:
@@ -201,3 +203,197 @@ def summarise(results, n_folds):
     return {"mean_auc": float(np.nanmean(aucs)), "std_auc": float(np.nanstd(aucs)),
             "mean_floor": float(np.nanmean(floors)), "folds_beating_floor": beat,
             "n_folds": len(results)}
+
+
+@dataclass(frozen=True)
+class RegressionFoldResult:
+    """One fold's regression error and the trivial errors it had to beat.
+
+    Frozen and constructed only by `regression_fold_result`, for the same
+    reason `FoldResult` is: on this data a number without its floor beside it
+    has repeatedly meant the opposite of what it looked like.
+    """
+
+    label: str
+    mae: float
+    floor_mae: float
+    constant_mae: float
+    persistence_mae: float
+    spearman: float
+    persistence_spearman: float
+    per_seed_maes: tuple
+    censored_frac: float
+    n: int
+    report: dict
+
+    @property
+    def beats_floor(self):
+        return bool(np.isfinite(self.mae) and self.mae < self.floor_mae)
+
+    @property
+    def skill(self):
+        """Fraction of the floor's error removed. Negative means worse than trivial."""
+        if not (np.isfinite(self.mae) and np.isfinite(self.floor_mae)) or self.floor_mae == 0:
+            return float("nan")
+        return float(1.0 - self.mae / self.floor_mae)
+
+    @property
+    def seed_spread(self):
+        m = [x for x in self.per_seed_maes if np.isfinite(x)]
+        return float(max(m) - min(m)) if len(m) > 1 else 0.0
+
+
+def persistence_regression(dsp_train, y_train, dsp_test, n_bins=10):
+    """Predicts days-to-next from days-since-previous, fitted on the train split.
+
+    The backward-looking rule that costs nothing, and therefore the bar. Time
+    since the last qualifying event is known at prediction time and is the
+    single most informative scalar in the catalogue: after a mainshock the next
+    event is close (Omori), during a quiet stretch it is far. A model that
+    cannot beat this has learnt nothing the clock did not already say.
+
+    A conditional median over deciles rather than a fitted line: the
+    relationship is monotone but nowhere near linear, and a least-squares fit
+    would understate the floor by mismodelling it -- making the model look
+    better for a reason that has nothing to do with the model.
+
+    The median, not the mean, because the comparison is MAE and the median is
+    what minimises it. Scoring a mean-optimal baseline on an
+    absolute-error metric is how a floor gets quietly lowered.
+
+    Args:
+        dsp_train, y_train: Days-since-previous and target on the TRAIN split.
+        dsp_test: Days-since-previous on the split being scored.
+        n_bins: Decile count for the conditional median.
+
+    Returns:
+        Prediction array for `dsp_test`. Hours with no previous event -- the
+        opening of the archive -- fall back to the unconditional train median,
+        which is the only thing known about them.
+    """
+    ok = np.isfinite(dsp_train) & np.isfinite(y_train)
+    fallback = float(np.median(y_train[np.isfinite(y_train)])) if np.isfinite(y_train).any() else 0.0
+    if ok.sum() < n_bins * 2:
+        return np.full(len(dsp_test), fallback)
+    edges = np.unique(np.quantile(dsp_train[ok], np.linspace(0, 1, n_bins + 1)))
+    if len(edges) < 3:
+        return np.full(len(dsp_test), fallback)
+    which = np.clip(np.searchsorted(edges, dsp_train[ok], side="right") - 1,
+                    0, len(edges) - 2)
+    medians = np.array([
+        np.median(y_train[ok][which == b]) if (which == b).any() else fallback
+        for b in range(len(edges) - 1)])
+    out = np.full(len(dsp_test), fallback)
+    seen = np.isfinite(dsp_test)
+    bins = np.clip(np.searchsorted(edges, dsp_test[seen], side="right") - 1,
+                   0, len(edges) - 2)
+    out[seen] = medians[bins]
+    return out
+
+
+def regression_fold_result(label, y_true, ensemble_pred, per_seed_preds, y_train,
+                           dsp_train, dsp_test, censored=None, quiet=False,
+                           model_name="model"):
+    """Scores one regression fold against its own floors, and prints both.
+
+    Two floors, both trivial, both computed from the training split only:
+
+    * **constant** -- the training median. It has zero rank correlation by
+      construction, so it is the bar that says whether the model has learnt
+      anything beyond the base rate.
+    * **persistence** -- days-to-next conditioned on days-since-previous. The
+      real bar, and usually much the harder of the two.
+
+    The floor is the better (lower-MAE) of them, because a model has to beat
+    whichever trivial rule happens to win on that fold, not the one that
+    flatters it.
+    """
+    y_true = np.asarray(y_true, dtype=np.float64)
+    const_pred = np.full(len(y_true), float(np.median(y_train)))
+    pers_pred = persistence_regression(dsp_train, y_train, dsp_test)
+
+    const_mae = float(np.mean(np.abs(const_pred - y_true)))
+    pers_mae = float(np.mean(np.abs(pers_pred - y_true)))
+    floor_mae = min(const_mae, pers_mae)
+
+    report = regression_report(y_true, ensemble_pred)
+    per_seed = tuple(float(np.mean(np.abs(np.asarray(p, dtype=np.float64) - y_true)))
+                     for p in per_seed_preds)
+    pers_rho = safe_spearman(y_true, pers_pred)
+    censored_frac = float(np.mean(censored)) if censored is not None else float("nan")
+
+    if not quiet:
+        print("\n--- Floors (test set, fitted on train only) ---")
+        print(f"  constant (train median {const_pred[0]:.2f} d)   "
+              f"MAE {const_mae:.3f} d")
+        print(f"  persistence (days-since-prev)             "
+              f"MAE {pers_mae:.3f} d   Spearman {pers_rho:+.4f}")
+        print(f"  -> floor to beat                          MAE {floor_mae:.3f} d")
+        print(f"\n--- {model_name} ---")
+        print(f"  per-seed MAE: {[f'{m:.3f}' for m in per_seed]}  "
+              f"mean {np.mean(per_seed):.3f}  "
+              f"spread {max(per_seed) - min(per_seed):.3f} d")
+        print(f"  ENSEMBLE (mean of {len(per_seed)} seeds' predictions)   "
+              f"MAE {report['mae']:.3f} d   n={len(y_true)}")
+        skill = 1.0 - report["mae"] / floor_mae if floor_mae else float("nan")
+        print(f"  skill vs floor: {skill:+.4f}   "
+              f"({'beats it' if skill > 0 else 'does not beat it'})")
+        if np.isfinite(censored_frac):
+            print(f"  censored at the cap: {censored_frac * 100:.1f}% of test hours"
+                  + ("   <- most of the target is the cap, so MAE is mostly "
+                     "measuring the cap" if censored_frac > 0.5 else ""))
+        if np.isfinite(report["pred_std"]) and report["pred_std"] < 0.05 * float(np.std(y_true) or 1):
+            print("  [!] the prediction is nearly constant -- the model has "
+                  "collapsed to the base rate,\n      which an MAE close to the "
+                  "constant floor would otherwise hide.")
+        print_report(f"{model_name} ensemble ({label}, test set)", report)
+
+    return RegressionFoldResult(
+        label=label, mae=float(report["mae"]), floor_mae=float(floor_mae),
+        constant_mae=const_mae, persistence_mae=pers_mae,
+        spearman=float(report["spearman"]), persistence_spearman=float(pers_rho),
+        per_seed_maes=per_seed, censored_frac=censored_frac,
+        n=int(len(y_true)), report=report)
+
+
+def summarise_regression(results, n_folds):
+    """The walk-forward summary for a regression run.
+
+    Raises:
+        TypeError: If handed anything but `RegressionFoldResult`s -- the same
+            hole `summarise` refuses to leave open.
+    """
+    bad = [r for r in results if not isinstance(r, RegressionFoldResult)]
+    if bad:
+        raise TypeError(
+            "summarise_regression() takes RegressionFoldResult objects, which "
+            "carry the floors their MAE was measured against. A bare MAE has no "
+            "meaning here: it moves with the censoring cap and with how the "
+            "wait times fall in a fold.")
+    if not results:
+        print("\n  no fold completed -- nothing to summarise")
+        return None
+
+    maes = np.array([r.mae for r in results], dtype=float)
+    floors = np.array([r.floor_mae for r in results], dtype=float)
+    rhos = np.array([r.spearman for r in results], dtype=float)
+    beat = sum(r.beats_floor for r in results)
+    print(f"\n{'=' * 64}\nWalk-forward CV summary ({len(results)}/{n_folds} folds, "
+          f"regression)\n{'=' * 64}")
+    print(f"  ensemble MAE per fold: {[f'{m:.3f}' for m in maes]} d")
+    print(f"  ensemble MAE:  mean {np.nanmean(maes):.3f}  std {np.nanstd(maes):.3f} d")
+    print(f"  floor MAE:     mean {np.nanmean(floors):.3f}  std {np.nanstd(floors):.3f} d")
+    print(f"  Spearman per fold: {[f'{r:+.4f}' for r in rhos]}")
+    print(f"  beats its own fold's floor in {beat}/{len(results)} folds")
+    if len(results) > 1 and np.nanstd(maes) > abs(np.nanmean(maes) - np.nanmean(floors)):
+        print("  [!] fold spread exceeds the margin over the floor -- read the "
+              "per-fold column,\n      not the mean. This is the condition under "
+              "which a pooled number misleads.")
+    if np.nanmean(np.abs(rhos)) < 0.05:
+        print("  [!] rank correlation is ~0 across folds: the model is not "
+              "ordering the hours,\n      whatever its MAE says. An MAE near the "
+              "constant floor is the base rate, not a forecast.")
+    return {"mean_mae": float(np.nanmean(maes)), "std_mae": float(np.nanstd(maes)),
+            "mean_floor_mae": float(np.nanmean(floors)),
+            "mean_spearman": float(np.nanmean(rhos)),
+            "folds_beating_floor": beat, "n_folds": len(results)}

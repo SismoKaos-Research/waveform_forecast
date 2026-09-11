@@ -23,6 +23,8 @@ from waveform_forecast.train import train_one_seed
 class Args:
     """The knobs `train_one_seed` reads, at their smallest useful values."""
     arm = "features"
+    mode = "classify"
+    target_transform = "log1p"
     hidden = 8
     proj_dim = None
     dropout = 0.0

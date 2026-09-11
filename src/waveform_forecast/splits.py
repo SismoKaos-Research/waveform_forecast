@@ -6,14 +6,25 @@ Hourly rows are not independent observations: a handful of distinct
 earthquakes drive every label in a fold, so the diagnostics print distinct
 event counts beside each split rather than row counts alone."""
 
+import warnings
+
 import numpy as np
 import pandas as pd
 
 
 def print_split_diagnostics(hourly_index: pd.DatetimeIndex, labels: np.ndarray,
                             train_idx: np.ndarray, val_idx: np.ndarray, test_idx: np.ndarray,
-                            n_blocks: int = 10, skew_ratio: float = 1.5) -> None:
-    """Positive rate over time in `n_blocks` equal-width windows."""
+                            n_blocks: int = 10, skew_ratio: float = 1.5,
+                            quantity: str = "pos rate") -> None:
+    """How the label moves over time, in `n_blocks` equal-width windows.
+
+    Args:
+        quantity: What the per-block mean is called. The default reads the
+            label as a 0/1 rate; a continuous target passes its own name, or
+            the block line reports "pos rate 14.000" for a wait measured in
+            days and the skew warning talks about a positive rate that does
+            not exist.
+    """
     n = len(hourly_index)
     edges = np.linspace(0, n, n_blocks + 1).astype(int)
     split_of = np.full(n, "", dtype=object)
@@ -21,7 +32,7 @@ def print_split_diagnostics(hourly_index: pd.DatetimeIndex, labels: np.ndarray,
     split_of[val_idx] = "val"
     split_of[test_idx] = "test"
 
-    print("\n  positive rate over time (equal-width blocks):")
+    print(f"\n  {quantity} over time (equal-width blocks):")
     for b in range(n_blocks):
         lo, hi = edges[b], edges[b + 1]
         if hi <= lo:
@@ -29,18 +40,28 @@ def print_split_diagnostics(hourly_index: pd.DatetimeIndex, labels: np.ndarray,
         block_splits = split_of[lo:hi]
         present = block_splits[block_splits != ""]
         dominant = pd.Series(present).mode().iloc[0] if len(present) else "-"
+        # nanmean: a regression target is NaN where the record ends before the
+        # next event, and one such hour would blank the whole block. A block
+        # that is ENTIRELY past the last event is all-NaN, which nanmean reports
+        # as NaN with a RuntimeWarning -- correct, and worth showing as NaN
+        # rather than silently omitting, since it says exactly where the label
+        # stops being knowable. Silenced here rather than globally so the
+        # warning keeps its meaning everywhere else.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            block_mean = np.nanmean(labels[lo:hi])
         print(f"    {hourly_index[lo].date()} .. {hourly_index[hi - 1].date()}  "
-               f"pos rate {labels[lo:hi].mean():.3f}  n={hi - lo:4d}  split~{dominant}")
+               f"{quantity} {block_mean:.3f}  n={hi - lo:4d}  split~{dominant}")
 
-    rates = {name: labels[idx].mean() for name, idx in
+    rates = {name: np.nanmean(labels[idx]) for name, idx in
              (("train", train_idx), ("val", val_idx), ("test", test_idx)) if len(idx)}
     if "train" in rates and "test" in rates and rates["train"] > 0:
         ratio = rates["test"] / rates["train"]
         if ratio > skew_ratio or ratio < 1 / skew_ratio:
-            print(f"\n  [!] test positive rate ({rates['test']:.3f}) is {ratio:.2f}x train's "
+            print(f"\n  [!] test {quantity} ({rates['test']:.3f}) is {ratio:.2f}x train's "
                    f"({rates['train']:.3f}) -- likely a swarm or quiet period concentrated in "
-                   "one split rather than the model generalizing. Compare AUC against the "
-                   "base-rate/persistence floors below (same skew), not against 0.5.")
+                   "one split rather than the model generalizing. Compare against the "
+                   "floors below (same skew), not against a nominal baseline.")
 
 
 def walk_forward_splits(valid_end_indices: np.ndarray, n_folds: int, labels: np.ndarray = None,

@@ -105,6 +105,64 @@ def days_since_prev_major(hourly_index: pd.DatetimeIndex, major_times: np.ndarra
             out[i] = (ti - prev[-1]) / np.timedelta64(1, "D")
     return out
 
+def days_to_next_major(hourly_index: pd.DatetimeIndex, major_times: np.ndarray,
+                       cap_days: float = None, feature_hours: float = 1.0):
+    """Days from each hour until the NEXT qualifying event. The regression target.
+
+    The mirror of `days_since_prev_major`, and it has one problem that function
+    does not: the archive ends, and the catalogue ends with it. Every hour after
+    the last qualifying event has no next event at all. That is right-censoring,
+    not a zero and not a large number, so those hours come back NaN and the
+    caller drops them -- filling them would teach the model that the quietest
+    period in the record is the one just before the archive stops.
+
+    **The horizon starts when the features END.** Same reason as `label_hours`:
+    `hourly_index` holds hour starts, the features for hour H cover [H, H+1h],
+    and an event inside that window is visible in the features. Measuring from
+    H would let the model read a fraction of its own answer off the input.
+
+    **`cap_days` is not a convenience, it is what makes the split honest.** An
+    uncapped "days to next" depends on an event arbitrarily far ahead, so a
+    training hour near a fold boundary carries a label decided by an event
+    inside the validation block, and no finite embargo removes it. Censoring at
+    `cap_days` bounds the label's lookahead to exactly that window, which is
+    what lets `walk_forward_splits` purge it -- and it makes the target directly
+    comparable to `label_hours` at the same horizon, since both then depend on
+    events in the same interval.
+
+    Args:
+        hourly_index: Hour-start timestamps, one per sample.
+        major_times: Sorted qualifying event times.
+        cap_days: Censor at this many days; targets beyond it are set to it.
+            None leaves the target uncapped, which is only safe when there is
+            no forward split to leak across.
+        feature_hours: Length of the feature window opening at each index.
+
+    Returns:
+        (days, censored) -- float array of days to the next event, NaN where
+        the record ends first, and a bool array marking the hours whose true
+        wait exceeded `cap_days`. The mask is returned rather than folded away
+        because a target that is 30.0 because the wait was 30 days and one that
+        is 30.0 because the wait was nine months are not the same observation,
+        and the fraction of each belongs in the report.
+    """
+    offset = np.timedelta64(int(round(feature_hours * 3600)), "s")
+    t = hourly_index.to_numpy() + offset
+    # searchsorted rather than a scan: this runs over ~17,000 hours against a
+    # sorted event list, and the loop in `days_since_prev_major` is already the
+    # slowest thing in `build_inputs`.
+    idx = np.searchsorted(major_times, t, side="left")
+    out = np.full(len(t), np.nan)
+    has_next = idx < len(major_times)
+    out[has_next] = ((major_times[idx[has_next]] - t[has_next])
+                     / np.timedelta64(1, "D"))
+    censored = np.zeros(len(t), dtype=bool)
+    if cap_days is not None:
+        censored = np.isfinite(out) & (out > cap_days)
+        out = np.where(censored, float(cap_days), out)
+    return out, censored
+
+
 def label_hours_rate_change(hourly_index: pd.DatetimeIndex, rate_times: np.ndarray,
                             horizon_days: float, baseline_days: float = None):
     """Labels each hour with whether seismicity RATE will increase ("variant B").

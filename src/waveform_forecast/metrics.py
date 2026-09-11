@@ -117,3 +117,68 @@ def print_report(name, report, digits=4):
         print("  confusion_matrix:")
         for row in report["confusion_matrix"]:
             print("   ", row)
+
+def regression_report(y_true, y_pred):
+    """Full metric set for a continuous target, in the target's own units.
+
+    `print_report` has documented this function since the port; it had no
+    implementation because nothing regressed yet.
+
+    **Spearman is the one to read against the classifier.** MAE depends on the
+    censoring cap and on how the wait times happen to be distributed in a fold,
+    so it is not comparable across folds, let alone across labels. The rank
+    correlation is, and it is the same question ROC-AUC answers for the binary
+    label: does the model order the hours correctly. A model with a fine MAE and
+    a Spearman near zero has learnt the base rate and nothing else -- which is
+    exactly what predicting the training median achieves.
+
+    Args:
+        y_true: Observed values.
+        y_pred: Predicted values, same units.
+
+    Returns:
+        Dict with "n", "mae", "rmse", "median_ae", "r2", "spearman",
+        "pearson", and "pred_std" (NaN where undefined).
+    """
+    y_true = np.asarray(y_true, dtype=np.float64)
+    y_pred = np.asarray(y_pred, dtype=np.float64)
+    ok = np.isfinite(y_true) & np.isfinite(y_pred)
+    y_true, y_pred = y_true[ok], y_pred[ok]
+    if len(y_true) == 0:
+        return {"n": 0, "mae": float("nan"), "rmse": float("nan"),
+                "median_ae": float("nan"), "r2": float("nan"),
+                "spearman": float("nan"), "pearson": float("nan"),
+                "pred_std": float("nan")}
+    err = y_pred - y_true
+    var = float(np.var(y_true))
+    return {
+        "n": len(y_true),
+        "mae": float(np.mean(np.abs(err))),
+        "rmse": float(np.sqrt(np.mean(err ** 2))),
+        "median_ae": float(np.median(np.abs(err))),
+        # NaN, not 0, on a constant target: R^2 is undefined there, and
+        # reporting 0 would read as "no better than the mean" when the mean is
+        # the only possible answer.
+        "r2": float("nan") if var == 0 else float(1.0 - np.mean(err ** 2) / var),
+        "spearman": safe_spearman(y_true, y_pred),
+        "pearson": safe_pearson(y_true, y_pred),
+        # A collapsed prediction is the failure mode of a censored target: the
+        # model learns the cap and emits it everywhere. A near-zero spread says
+        # so immediately, where MAE alone would look respectable.
+        "pred_std": float(np.std(y_pred)),
+    }
+
+def safe_spearman(y_true, y_pred):
+    """Rank correlation, NaN when either side is constant."""
+    from scipy.stats import spearmanr
+    y_true, y_pred = np.asarray(y_true), np.asarray(y_pred)
+    if len(y_true) < 3 or len(np.unique(y_true)) < 2 or len(np.unique(y_pred)) < 2:
+        return float("nan")
+    return float(spearmanr(y_true, y_pred).statistic)
+
+def safe_pearson(y_true, y_pred):
+    """Linear correlation, NaN when either side is constant."""
+    y_true, y_pred = np.asarray(y_true, dtype=np.float64), np.asarray(y_pred, dtype=np.float64)
+    if len(y_true) < 3 or np.std(y_true) == 0 or np.std(y_pred) == 0:
+        return float("nan")
+    return float(np.corrcoef(y_true, y_pred)[0, 1])
