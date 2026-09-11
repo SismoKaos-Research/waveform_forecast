@@ -168,28 +168,57 @@ def train_one_seed(args, seed, ds_train, ds_val, ds_test, feat_dim, device):
     sched = optim.lr_scheduler.CosineAnnealingLR(opt, T_max=args.epochs)
 
     def score(loader):
+        """Returns (y_true, y_score, mean_loss) for one split.
+
+        The loss comes from the SAME criterion the optimiser saw, pos_weight
+        included. A val loss computed with an unweighted BCE would be on a
+        different scale from the training objective and could not be read
+        against it, which is most of what a val loss is for.
+        """
         model.eval()
-        ys, ss = [], []
+        ys, ss, total, seen = [], [], 0.0, 0
         with torch.no_grad():
             for w, m, y in loader:
+                yd = y.to(device)
                 logit = model(w.to(device), m.to(device))
+                # Weighted by batch size, not averaged over batches: the last
+                # batch is usually short, and a plain mean of batch means lets
+                # its handful of windows count as much as a full batch.
+                total += float(criterion(logit, yd)) * len(y)
+                seen += len(y)
                 ss.extend(torch.sigmoid(logit).cpu().tolist())
                 ys.extend(y.tolist())
-        return np.array(ys, dtype=np.int64), np.array(ss)
+        return (np.array(ys, dtype=np.int64), np.array(ss),
+                total / seen if seen else float("nan"))
 
     best, no_improve, best_state = -1.0, 0, None
     for epoch in range(args.epochs):
         model.train()
+        run_loss, run_n = 0.0, 0
         for w, m, y in tr:
             loss = criterion(model(w.to(device), m.to(device)), y.to(device))
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             opt.step()
             opt.zero_grad()
+            # detach, or reading the scalar keeps the graph alive for the
+            # whole epoch's worth of batches -- a slow memory leak on the
+            # raw arm, where one window is 3 x 18,000 samples.
+            run_loss += float(loss.detach()) * len(y)
+            run_n += len(y)
         sched.step()
-        yv, sv = score(va)
+        yv, sv, val_loss = score(va)
         val_auc = safe_auc(yv, sv)
-        print(f"  [seed {seed}] epoch {epoch + 1}/{args.epochs} val AUC {val_auc:.4f}")
+        # Both losses, because a val loss alone cannot separate a model that is
+        # learning slowly from one that has started memorising -- and the val
+        # AUC alone hides both. The positive class here is a handful of events
+        # per fold, so `safe_auc` returns NaN whenever a val block happens to
+        # hold one class; the loss stays finite and readable when that happens,
+        # which is exactly the epoch where a number is wanted.
+        print(f"  [seed {seed}] epoch {epoch + 1}/{args.epochs}"
+              f"  train loss {run_loss / max(run_n, 1):.4f}"
+              f"  val loss {val_loss:.4f}"
+              f"  val AUC {val_auc:.4f}")
         if np.isfinite(val_auc) and val_auc > best:
             best, no_improve = val_auc, 0
             best_state = {k: v.clone() for k, v in model.state_dict().items()}
@@ -200,8 +229,9 @@ def train_one_seed(args, seed, ds_train, ds_val, ds_test, feat_dim, device):
 
     if best_state is not None:
         model.load_state_dict(best_state)
-    yt, st = score(te)
-    print(f"  [seed {seed}] test AUC {safe_auc(yt, st):.4f}")
+    yt, st, test_loss = score(te)
+    print(f"  [seed {seed}] test loss {test_loss:.4f}  "
+          f"test AUC {safe_auc(yt, st):.4f}")
     return yt, st
 
 
