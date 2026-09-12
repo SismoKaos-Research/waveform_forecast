@@ -30,6 +30,7 @@ to test whether anything transfers across fault zones.
 src/waveform_forecast/
   cli.py         dispatch: `waveform-forecast <command>` → that module's main()
   features.py    CMD. extractor parquet/CSV → one aligned hourly table
+  waveforms.py   CMD. miniSEED archives → hourly 5 Hz waveform tensor (--arm raw)
   train.py       CMD. train the ensemble, walk-forward, and score it
   data.py        windowing, per-(station,feature) standardization, Dataset
   regions.py     station coordinates, zones, region-local event loading
@@ -68,13 +69,20 @@ waveform-forecast train --features hourly.parquet \
     --mode rate --rate-threshold 3.0 \
     --keep-features Z_STA_LTA_Max_max EN_CROSS_CORR_mean --cv-folds 5
 
-# 4. regress: how many days until the next one
+# 4. the raw arm: build the waveform tensor first, then train on it
+waveform-forecast waveforms --station MANT=../mseed/MANT \
+    --station DEMI=../mseed/DEMI --rate 5 --out wav5
+waveform-forecast train --arm raw --waveforms wav5 --stations aegean \
+    --catalog-path cnn_earthquake/catalogs/catalog_current.csv \
+    --label-radius-km 150 --seq-hours 8 --batch-size 16 --cv-folds 5
+
+# 5. regress: how many days until the next one
 waveform-forecast train --mode regress --features hourly.parquet \
     --stations MANT DEMI \
     --catalog-path cnn_earthquake/catalogs/catalog_current.csv \
     --keep-features Z_STA_LTA_Max_max EN_CROSS_CORR_mean --cv-folds 5
 
-uv run pytest        # 134 tests
+uv run pytest        # 161 tests
 ```
 
 ## Read this expecting a negative
@@ -83,5 +91,7 @@ The waveform arms are a documented negative in this project's earlier work: on
 the corrected catalogue neither raw-waveform CNNs nor hand-crafted continuous
 features beat persistence — 0 of 10 chaos-sweep cells, all three sequence
 architectures below floor. Multi-station pooling is a genuine difference from
-those runs. The floor is the same floor. See
-[performance.md](performance.md) for what the measurement actually says.
+those runs, and so is the raw arm, which had never actually run before.
+
+Nine walk-forward runs later, every one of them sits below its own floor. See
+[performance.md](performance.md).

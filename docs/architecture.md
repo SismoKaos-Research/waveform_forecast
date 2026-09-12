@@ -108,6 +108,8 @@ Keeping it byte-identical is what lets a multi-station number be read against th
 published single-station figures: the difference between the runs is the station
 axis, not the sequence model.
 
+<a id="the-two-arms"></a>
+
 ## The two arms
 
 They differ by **one constructor argument**.
@@ -122,6 +124,21 @@ They differ by **one constructor argument**.
 stride 4 each, then adaptive average pooling — unchanged from
 `cnn_earthquake/.../waveform.py`, the shape the published single-station runs
 used.
+
+**`--arm raw` could not run until `waveforms.py` existed.** The flag, the
+encoder and the `--help` text shipped in the first commit, but `build_inputs`
+only ever read the hourly *feature* parquet — so the flag handed a 3,072-wide
+aggregate vector to a `Conv1d` expecting three channels of samples:
+
+```
+RuntimeError: Given groups=1, weight of size [16, 3, 7], expected
+input[1, 3072, 1] to have 3 channels, but got 3072 channels instead
+```
+
+`waveform-forecast waveforms` builds the missing tensor; see
+[data-pipeline.md](data-pipeline.md#the-raw-tensor). The raw arm needs a much
+smaller `--seq-hours` and `--batch-size` than the feature arm: at 24 h and batch
+64 one batch is 664 MB, against 55 MB at 8 h and batch 16.
 
 Splits, purge, floor and folds are shared between the arms. That sharing is what
 makes them a comparison rather than two unrelated runs.

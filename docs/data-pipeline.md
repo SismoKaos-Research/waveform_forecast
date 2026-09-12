@@ -157,6 +157,48 @@ and an unknown name is an error rather than a silent no-op.
 `--drop-dev` at `features` time drops the extractors' `_DEV` inter-window-diff
 columns, halving the width before anything else sees them.
 
+<a id="the-raw-tensor"></a>
+
+## The raw tensor (`waveform-forecast waveforms`)
+
+What `--arm raw` consumes, and the stage that did not exist until it was built.
+86 GB of gapped 100 Hz miniSEED across 121 files becomes one hourly tensor of
+shape (hours, 3, `rate`x3600), 4.3 GB per station at 5 Hz, memmapped and stacked
+one window at a time by `data.StackedStations`.
+
+Decoding miniSEED at train time is not an option — one file holds ~2,000 traces
+because the recording is gappy, and it would be re-decoded every epoch, seed and
+fold.
+
+Three things in it are load-bearing:
+
+**The decimation low-passes before it downsamples.** A plain `data[::20]` folds
+everything above the new 2.5 Hz Nyquist back into the band that is kept, and
+2–3 Hz is exactly where an STA/LTA responds — aliased noise that looks like
+signal. Verified in `tests/test_waveforms.py`: 1 Hz survives at 0.95, 32 Hz drops
+to 0.0000, while a stride leaves it at 1.0 folded to 2 Hz. 100 → 5 Hz is 20x,
+past where `scipy.signal.decimate` is stable in one pass, so it runs as 10x
+then 2x.
+
+**Samples are placed by absolute time**, not by counting from each trace's
+start. A trace beginning 37 s into an hour must land 37 s in; counting
+misplaces everything after the first gap.
+
+**The tensor is float32, not float16.** Raw counts reach 3.5e6 on MANT and
+float16 saturates at 65,504. A first pass silently pinned 52,637 cells of a
+single 21-day file to ±inf — no error, just clipped amplitudes on the loudest
+hours, which are the ones a forecaster cares about. And `inf × 0` is NaN, so it
+would have poisoned the pool exactly like the NaN bug the mask exists to
+prevent, arriving through the amplitude instead of the gap.
+
+Presence works as in `features`: an hour with less than `--min-coverage` of its
+samples recorded is written as zeros **and marked absent**. The zeros are never
+read as data; the mask is what says so.
+
+Statistics for the raw arm are per **(station, channel)**, pooled over samples —
+a per-sample mean would be 18,000 numbers describing where in the hour a sample
+sat, and would standardize away the amplitude that is the signal.
+
 ## Which windows are usable
 
 A window is usable when its **last hour** — the one the label attaches to — has at

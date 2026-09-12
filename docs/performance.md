@@ -1,25 +1,34 @@
 # Measured performance
 
-**Headline: the model does not beat its floor.** Across seven walk-forward runs on
-the four-station archive it cleared its own fold's bar in 1/5, 1/5, 0/5, 0/5, 0/5,
-2/5 and 0/5 folds. In every run the mean AUC sat **below the mean floor**, and the
-fold-to-fold spread exceeded the margin over the floor — the condition under which
-a pooled number misleads. This matches the project's prior negative result and
-does not overturn it.
+**Headline: the model does not beat its floor.** Across nine walk-forward runs on
+the four-station archive, **every run's mean AUC sat below its mean floor**, and
+in every run the fold-to-fold spread exceeded the margin over the floor — the
+condition under which a pooled number misleads. This matches the project's prior
+negative result and does not overturn it.
 
-Three things were varied, and none of them helped:
+Four things were varied, and none of them changed the conclusion:
 
 | lever | runs | outcome |
 |---|---|---|
 | **more stations** (2 → 4) | 1 vs 2 | +0.021 mean AUC against a fold SD of 0.18 |
 | **region-local labels + a rate target** | 4–5 | model at **chance** in both tectonic zones |
 | **more features** (2 → 207) | 6–7 | no gain; on the identical rate label, *worse* |
+| **raw waveforms instead of aggregates** | 8 vs 9 | the CNN tracks the aggregates fold for fold, and ends *below* them |
+
+One lever did move the model toward its bar without ever clearing it: shortening
+the temporal context from 24 h to 8 h closed the gap from −0.050 to −0.003
+(Run 7 vs Run 9). See § Sequence length.
+
+Every run shows the same shape: **clear a low floor on the early folds, collapse
+once the floor rises past ~0.6.** That is what a model tracking the base rate
+does, and no lever above changed it.
 
 Everything below is from runs executed on 2026-09-12. The raw console logs are in
 [`runs/`](runs/) — `classify_mant_demi.log`, `classify_4sta.log`,
 `regress_mant_demi.log`, `rate_marmara_inzone.log`, `rate_aegean_inzone.log`,
-`rate_aegean_wide207.log`, `classify_aegean_wide207.log` — and every number here
-is copied from them rather than recomputed.
+`rate_aegean_wide207.log`, `classify_aegean_wide207.log`,
+`raw_aegean_classify.log`, `feat_seq8_control.log`, `waveforms_extract.log` —
+and every number here is copied from them rather than recomputed.
 
 ## The corpus
 
@@ -334,6 +343,86 @@ the training block. The warning in the docstring was correct for classify — bu
 note it did **not** apply to Run 6, where the rate label is driven by 1,084
 events and the model still gained nothing.
 
+## Runs 8 and 9 — raw waveforms vs. the aggregates that replaced them
+
+The hypothesis: `features` collapses ~72 windows an hour into `mean`, `std`,
+`max`, and the code itself argues that averaging destroys what a transient
+measure computes. If a precursor is a burst lasting minutes, three scalars per
+hour may throw it away before the model ever runs — which would make runs 1–7
+evidence about the *aggregates*, not about the waveforms.
+
+**`--arm raw` had never been run, because it could not be.** See
+[architecture.md](architecture.md#the-two-arms): the flag existed from the first
+commit but nothing produced the tensor it consumes, and it died on the first
+forward pass. `waveform-forecast waveforms` is that missing stage.
+
+The two runs are matched on everything but the input:
+
+```
+--stations aegean --label-radius-km 150 --mode classify --horizon-days 14
+--seq-hours 8 --batch-size 16 --cv-folds 5
+  Run 8:  --arm raw      --waveforms wav5          18,000 samples/station-hour
+  Run 9:  --arm features --features hourly_4sta     3 aggregates x 207 columns
+```
+
+| fold | floor | **Run 8 raw** | **Run 9 aggregates** |
+|---|---:|---:|---:|
+| 1 | 0.5018 | **0.5734** ✅ | **0.7180** ✅ |
+| 2 | 0.5299 | **0.5432** ✅ | **0.5441** ✅ |
+| 3 | 0.6168 | **0.5557** ❌ | **0.5154** ❌ |
+| 4 | 0.7324 | **0.4703** ❌ | **0.5166** ❌ |
+| 5 | 0.5000 | **nan** — | **nan** — |
+
+```
+Run 8 raw:         mean 0.5357  std 0.0392   floor mean 0.5762   2/5 folds
+Run 9 aggregates:  mean 0.5735  std 0.0842   floor mean 0.5760   2/5 folds
+```
+
+**Aggregation was not the problem.** The raw arm clears the same two folds,
+fails the same two, collapses at the same floor, and finishes **below** the
+aggregates it was meant to rescue (0.5357 vs 0.5735). Giving the CNN 6,000x more
+data per station-hour bought nothing.
+
+This is the hypothesis this document previously called the most likely confound.
+It was wrong, and it is now tested rather than assumed.
+
+### Sequence length — the one lever that moved anything
+
+Run 9 is Run 7's configuration with `--seq-hours` cut from 24 to 8:
+
+| | mean AUC | mean floor | gap |
+|---|---:|---:|---:|
+| Run 7, seq 24 | 0.5264 | 0.5766 | **−0.050** |
+| Run 9, seq 8 | 0.5735 | 0.5760 | **−0.003** |
+
+From clearly below floor to statistically indistinguishable from it. Twenty-four
+hours of context was diluting more than it added. It is still not a positive
+result — the mean is below the floor, it is 2/5 folds, and the spread warning
+fires — but it is the only change in nine runs that moved the model toward its
+bar rather than sideways.
+
+### What the raw tensor is
+
+`waveform-forecast waveforms`, 2024-04-30 → 2026-08-10:
+
+| | |
+|---|---|
+| grid | 19,946 hours x 3 channels x 18,000 samples (5 Hz) |
+| size | 4.31 GB per station, float32, memmapped |
+| MANT present | 17,710 h (88.8%) |
+| DEMI present | 12,878 h (64.6%) |
+| any / all | 99.3% / 54.0% |
+
+Those presence figures are an independent corroboration of the feature table:
+`features` reports 88.0% and 64.0% for the same stations, computed by entirely
+separate code from the same archives.
+
+The per-station scale difference is worth recording — MANT's samples have a
+standard deviation of 1.6e6 against DEMI's 1.07e3, a factor of ~1,500 from site
+response and instrument gain. That is precisely what per-(station, channel)
+standardization exists for, and pooling one shared statistic across stations
+would have destroyed it.
+
 ## Caveats that change how these numbers read
 
 Three, all visible in the logs, none of which the summary line captures:
@@ -384,6 +473,8 @@ of this configuration could have reported anything from "well below chance" to
 - Test the **spatial holdout**. `--test-stations` is implemented and tested
   (`tests/test_spatial_holdout.py`), but running it would be premature: there is
   no in-zone signal in either zone to transfer.
+- Explore sequence length properly. 8 h beat 24 h; 1–4 h was never tried, and it
+  is now the only lever with evidence behind it.
 
 ## Reproducing
 
