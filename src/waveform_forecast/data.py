@@ -22,8 +22,68 @@ left as NaN still poisons the pooled vector and every gradient after it.
 import warnings
 
 import numpy as np
+import pandas as pd
 import torch
 from torch.utils.data import Dataset
+
+
+class StackedStations:
+    """A (hours, stations, ...) view over one array per station.
+
+    The raw tensor is ~4.3 GB per station, so the station axis is stacked one
+    window at a time instead of being materialised. Slicing on the hour axis is
+    the only access `MultiStationWindows` needs, and that touches `seq_hours`
+    rows per sample rather than the whole archive.
+    """
+
+    def __init__(self, arrays):
+        self.arrays = list(arrays)
+        a0 = self.arrays[0]
+        self.shape = (a0.shape[0], len(self.arrays)) + tuple(a0.shape[1:])
+        self.ndim = len(self.shape)
+
+    def __len__(self):
+        return self.shape[0]
+
+    def __getitem__(self, key):
+        """Indexes the HOUR axis and stacks the stations into axis 1."""
+        return np.stack([np.asarray(a[key]) for a in self.arrays], axis=1)
+
+    def select(self, idx):
+        """The sub-view holding only these station positions."""
+        return StackedStations([self.arrays[i] for i in np.asarray(idx)])
+
+
+def load_waveform_tensor(path, stations):
+    """Memmaps `waveform-forecast waveforms` output for the given stations.
+
+    Returns:
+        (x, present, hour_index) where `x` is a `StackedStations` of shape
+        (hours, stations, 3, samples_per_hour).
+
+    Raises:
+        SystemExit: If the directory or a station's array is missing.
+    """
+    import sys
+    from pathlib import Path
+    d = Path(path)
+    idx_path = d / "index.parquet"
+    if not idx_path.exists():
+        sys.exit(f"[ERROR] {idx_path} does not exist. Build it with "
+                 f"`waveform-forecast waveforms --station CODE=DIR --out {d}`.")
+    idx = pd.read_parquet(idx_path)
+    arrays, mask = [], []
+    for s in stations:
+        f = d / f"{s}.npy"
+        if not f.exists():
+            have = sorted(p.stem for p in d.glob("*.npy"))
+            sys.exit(f"[ERROR] {f} does not exist; {d} holds {have}")
+        if f"present_{s}" not in idx.columns:
+            sys.exit(f"[ERROR] {idx_path} has no present_{s} column")
+        arrays.append(np.load(f, mmap_mode="r"))
+        mask.append(idx[f"present_{s}"].to_numpy(dtype=bool))
+    return (StackedStations(arrays), np.stack(mask, axis=1),
+            pd.DatetimeIndex(idx.index))
 
 
 def station_feature_columns(frame, stations):
@@ -110,13 +170,36 @@ def fit_stats(x, present, indices, seq_hours, all_station_rows=True):
                                min(500, len(indices))).astype(int)]
     rows = np.unique(np.concatenate(
         [np.arange(max(0, i - seq_hours + 1), i + 1) for i in take]))
+    # The raw tensor is ~2.6 MB per (hour, 2 stations), so the contiguous train
+    # range below would be several GB. Statistics over a few hundred sampled
+    # hours are already far tighter than the between-hour variation they
+    # describe, so cap the read rather than the accuracy.
+    raw = getattr(x, "ndim", 0) == 4
     if all_station_rows and len(rows):
         # The contiguous hour span the training windows cover. A station absent
         # from the training ZONE still has its own readings in here, and those
         # are what standardize it. Bounded by the train window's own extent, so
         # nothing after the split boundary is ever touched.
         rows = np.arange(int(rows.min()), int(rows.max()) + 1)
+    if raw and len(rows) > 400:
+        rows = rows[np.linspace(0, len(rows) - 1, 400).astype(int)]
     sub, msk = x[rows], present[rows]
+    if sub.ndim == 4:
+        # Raw arm: (rows, stations, channels, samples). Statistics are per
+        # (station, CHANNEL) -- pooled over samples, not per sample. A per-sample
+        # mean would be 18,000 numbers per channel describing nothing but where
+        # in the hour a sample sat, and would standardize away the amplitude
+        # that is the entire signal. Kept with a trailing axis so it broadcasts
+        # back over samples.
+        m4 = msk[..., None, None]
+        wide = np.where(m4, sub, np.nan)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            mu = np.nanmean(wide, axis=(0, 3), keepdims=False)
+            sd = np.nanstd(wide, axis=(0, 3), keepdims=False)
+        mu = np.where(np.isfinite(mu), mu, 0.0).astype(np.float32)[..., None]
+        sd = np.where(np.isfinite(sd) & (sd > 1e-8), sd, 1.0).astype(np.float32)[..., None]
+        return mu, sd
     wide = np.where(msk[..., None], sub, np.nan)
     # A station can be absent for an ENTIRE training split and that is not an
     # error -- GCAM's archive ends 2024-12, so any later fold has none of it.
@@ -180,7 +263,10 @@ class MultiStationWindows(Dataset):
             # Slice x/present/stats once here rather than per __getitem__: the
             # same three lines in the hot path cost a fancy-index copy on every
             # sample, and the arrays are views until something writes to them.
-            self.x, self.present = x[:, k], present[:, k]
+            # `StackedStations` selects whole per-station arrays instead, since
+            # its station axis does not exist until a window is requested.
+            self.x = x.select(k) if isinstance(x, StackedStations) else x[:, k]
+            self.present = present[:, k]
             mu, sd = mu[k], sd[k]
         self.mu, self.sd = mu, sd
 
@@ -193,10 +279,16 @@ class MultiStationWindows(Dataset):
         start = end - self.seq_hours + 1
         w = (self.x[start:end + 1] - self.mu) / self.sd
         m = self.present[start:end + 1]
+        # The mask is (time, stations); the window is (time, stations, features)
+        # on the feature arm and (time, stations, channels, samples) on the raw
+        # one. Broadcast by the difference rather than a fixed `[..., None]`, so
+        # one expression covers both and the raw arm cannot silently mask the
+        # wrong axis.
+        me = m.reshape(m.shape + (1,) * (w.ndim - m.ndim))
         # See the module docstring: masked cells must be finite, not NaN, or
         # `NaN * 0` in the pool takes the whole batch with it. The mask is what
         # keeps this zero from being read as a real average reading.
-        w = np.where(m[..., None], np.nan_to_num(w, nan=0.0), 0.0)
+        w = np.where(me, np.nan_to_num(w, nan=0.0), 0.0)
         return (torch.from_numpy(np.ascontiguousarray(w, dtype=np.float32)),
                 torch.from_numpy(np.ascontiguousarray(m)),
                 torch.tensor(self.labels[end], dtype=torch.float32))

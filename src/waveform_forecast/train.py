@@ -64,7 +64,8 @@ from waveform_forecast.catalog import (days_since_prev_major,
                                        label_hours_rate_change,
                                        label_resolution_index, label_hours,
                                        load_aegean_events)
-from waveform_forecast.data import MultiStationWindows, fit_stats, stack
+from waveform_forecast.data import (MultiStationWindows, fit_stats,
+                                    load_waveform_tensor, stack)
 from waveform_forecast.evaluate import (fold_result, regression_fold_result,
                                         summarise, summarise_regression)
 from waveform_forecast.metrics import safe_auc, safe_spearman
@@ -81,8 +82,13 @@ HELP = "train the multi-station forecaster and score it against its floor"
 
 
 def add_args(p):
-    p.add_argument("--features", required=True,
-                   help="the parquet `waveform-forecast features` wrote")
+    p.add_argument("--features", default=None,
+                   help="the parquet `waveform-forecast features` wrote "
+                        "(--arm features)")
+    p.add_argument("--waveforms", default=None,
+                   help="the directory `waveform-forecast waveforms` wrote "
+                        "(--arm raw). One <CODE>.npy per station plus "
+                        "index.parquet, memmapped rather than loaded.")
     p.add_argument("--stations", nargs="+", required=True,
                    help="station codes to use, as named in that table")
     p.add_argument("--catalog-path", required=True,
@@ -192,6 +198,10 @@ def build_inputs(args):
     Returns:
         (x, present, labels, dsp, hour_index, feature_names).
     """
+    if args.arm == "raw":
+        return build_raw_inputs(args)
+    if not args.features:
+        sys.exit("[ERROR] --features is required for --arm features")
     frame = pd.read_parquet(args.features).sort_index()
     if not isinstance(frame.index, pd.DatetimeIndex):
         sys.exit(f"[ERROR] {args.features} is not indexed by hour; was it "
@@ -231,6 +241,34 @@ def build_inputs(args):
     labels = {name: zone_labels(args, hour_index, zones[name], name)
               for name in ("train", "test")}
     return x, present, labels, hour_index, feats, zones
+
+
+def build_raw_inputs(args):
+    """The `--arm raw` counterpart to `build_inputs`.
+
+    Same labels, same zones, same folds -- the arms differ only in what reaches
+    the encoder, which is the only way the two are a comparison. The tensor is
+    memmapped per station and stacked one window at a time; see
+    `data.StackedStations`.
+    """
+    if not args.waveforms:
+        sys.exit("[ERROR] --arm raw needs --waveforms DIR, the output of "
+                 "`waveform-forecast waveforms`. The hourly feature parquet "
+                 "holds aggregates, not samples: feeding it to the 1D CNN is "
+                 "what produced\n    'expected input[1, 3072, 1] to have 3 "
+                 "channels, but got 3072 channels instead'.")
+    zones = resolve_zones(args)
+    wanted = [c for c, _ in zones["all"]]
+    x, present, hour_index = load_waveform_tensor(args.waveforms, wanted)
+    if hour_index.tz is not None:
+        hour_index = hour_index.tz_convert("UTC").tz_localize(None)
+    n_ch, n_samp = x.shape[2], x.shape[3]
+    print(f"  raw tensor: {x.shape[0]:,} hours x {x.shape[1]} station(s) x "
+          f"{n_ch} channel(s) x {n_samp:,} samples "
+          f"({n_samp / 3600:g} Hz)")
+    labels = {name: zone_labels(args, hour_index, zones[name], name)
+              for name in ("train", "test")}
+    return x, present, labels, hour_index, [f"ch{i}" for i in range(n_ch)], zones
 
 
 def resolve_zones(args):
@@ -584,10 +622,14 @@ def run_fold(label, args, x, present, lab, hour_index, tr_i, va_i, te_i,
 
 def run(args):
     x, present, lab, hour_index, feats, zones = build_inputs(args)
-    n, n_st, n_feat = x.shape
+    n, n_st, n_feat = x.shape[0], x.shape[1], x.shape[2]
     tr_lab, te_lab = lab["train"], lab["test"]
     spatial = args.test_stations is not None
-    print(f"\n  {n:,} hourly rows, {n_st} station(s), {n_feat} feature(s) each")
+    if args.arm == "raw":
+        print(f"\n  {n:,} hourly rows, {n_st} station(s), "
+              f"{n_feat} channel(s) x {x.shape[3]:,} samples each")
+    else:
+        print(f"\n  {n:,} hourly rows, {n_st} station(s), {n_feat} feature(s) each")
     if args.mode == "regress":
         ok = np.isfinite(tr_lab["labels"])
         cap = (f"censored at {args.cap_days:g} d" if args.cap_days is not None

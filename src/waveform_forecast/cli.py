@@ -14,6 +14,8 @@ import sys
 COMMANDS = {
     "features": ("waveform_forecast.features",
                  "aggregate extractor output into one aligned hourly table"),
+    "waveforms": ("waveform_forecast.waveforms",
+                  "decimate miniSEED archives into an hourly waveform tensor"),
     "train":    ("waveform_forecast.train",
                  "train the multi-station forecaster against its floor"),
 }
