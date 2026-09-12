@@ -175,6 +175,18 @@ def add_args(p):
     g.add_argument("--hidden", type=int, default=64)
     g.add_argument("--proj-dim", type=int, default=None)
     g.add_argument("--dropout", type=float, default=0.3)
+    g.add_argument("--branch", default="lstm", choices=["mean", "gru", "lstm"],
+                   help="the temporal model over the hour axis. lstm: the "
+                        "ported LSTM+attention branch (108k params). gru: the "
+                        "same architecture with a 3-gate cell (98k). mean: no "
+                        "temporal model at all (0). The branch is the largest "
+                        "single component of the network and the label is "
+                        "driven by ~30 events, so this is the capacity ladder, "
+                        "not a tuning knob.")
+    g.add_argument("--head", default="mlp", choices=["linear", "mlp"],
+                   help="mlp: the two-layer head. linear: one Linear off the "
+                        "branch. `--branch mean --head linear` is a pooled "
+                        "linear probe -- the floor of the ladder.")
 
     g = p.add_argument_group("training")
     g.add_argument("--epochs", type=int, default=40)
@@ -384,7 +396,16 @@ def train_one_seed(args, seed, ds_train, ds_val, ds_test, feat_dim, device):
         feat_dim = encoder.out_dim
     model = MultiStationForecaster(feat_dim=feat_dim, hidden=args.hidden,
                                    dropout=args.dropout, encoder=encoder,
-                                   proj_dim=args.proj_dim).to(device)
+                                   proj_dim=args.proj_dim,
+                                   branch=getattr(args, "branch", "lstm"),
+                                   head=getattr(args, "head", "mlp")).to(device)
+    if seed == seeds_first(args):
+        # Printed once per fold, not once per seed. The point of the ladder is
+        # parameters against events, so the count belongs beside the result
+        # rather than in a separate note.
+        n_par = sum(p.numel() for p in model.parameters())
+        print(f"  [model] branch={getattr(args, 'branch', 'lstm')} "
+              f"head={getattr(args, 'head', 'mlp')}  {n_par:,} parameter(s)")
 
     def dl(ds, sh):
         return DataLoader(ds, batch_size=args.batch_size, shuffle=sh,
@@ -511,6 +532,19 @@ def train_one_seed(args, seed, ds_train, ds_val, ds_test, feat_dim, device):
     return yt, st
 
 
+def seeds_first(args):
+    """The first seed of the ensemble, so per-model logging happens once.
+
+    Tolerates an `args` without `--ensemble-seeds`: `train_one_seed` is called
+    directly by the reporting tests with a minimal namespace, and a missing
+    attribute there should not be an error in the trainer.
+    """
+    spec = getattr(args, "ensemble_seeds", None)
+    if not spec:
+        return None
+    return int(str(spec).split(",")[0])
+
+
 def transform_target(labels, how):
     """Days -> the space the model is fitted in. `invert` undoes it."""
     if how != "log1p":
@@ -595,7 +629,8 @@ def run_fold(label, args, x, present, lab, hour_index, tr_i, va_i, te_i,
             yt_ref = yt
         per_seed.append(st)
 
-    name = f"multistation[{args.arm}]"
+    name = (f"multistation[{args.arm}/{getattr(args, 'branch', 'lstm')}"
+            f"+{getattr(args, 'head', 'mlp')}]")
     if spatial:
         name += f" {'+'.join(c for c, _ in zones['train'])}->{'+'.join(codes)}"
     if regress:

@@ -1,0 +1,501 @@
+  train zone: MANT+DEMI
+      MANT    38.4908N  28.5579E
+      DEMI    39.0428N  28.7162E
+      30 qualifying event(s) inside the archive span, within 150 km of the nearest
+          (106 in the catalogue overall; the earlier ones still set `days since previous`)
+  test zone: MANT+DEMI
+      MANT    38.4908N  28.5579E
+      DEMI    39.0428N  28.7162E
+      30 qualifying event(s) inside the archive span, within 150 km of the nearest
+          (106 in the catalogue overall; the earlier ones still set `days since previous`)
+
+  20,136 hourly rows, 2 station(s), 207 feature(s) each
+  hourly positive rate: train zone 0.243
+    MANT   present  88.0% of hours
+    DEMI   present  64.0% of hours
+    all stations: any  98.4%   all  53.6%
+  19,809 usable train window(s) of 20,129
+  device cuda, seeds [42, 43, 44], arm=features, mode=classify, embargo 343h
+
+================================================================
+fold 1/5
+================================================================
+  splits (chronological): train=2829 val=2487 test=2487
+    train: positive rate 0.119
+    val  : positive rate 0.000
+    test : positive rate 0.136
+
+  pos rate over time (equal-width blocks):
+    2024-04-23 .. 2024-07-15  pos rate 0.167  n=2013  split~train
+    2024-07-15 .. 2024-10-07  pos rate 0.000  n=2014  split~train
+    2024-10-07 .. 2024-12-30  pos rate 0.000  n=2013  split~val
+    2024-12-30 .. 2025-03-24  pos rate 0.000  n=2014  split~test
+    2025-03-24 .. 2025-06-16  pos rate 0.335  n=2014  split~test
+    2025-06-16 .. 2025-09-08  pos rate 0.509  n=2013  split~-
+    2025-09-08 .. 2025-12-01  pos rate 0.774  n=2014  split~-
+    2025-12-01 .. 2026-02-23  pos rate 0.313  n=2013  split~-
+    2026-02-23 .. 2026-05-18  pos rate 0.334  n=2014  split~-
+    2026-05-18 .. 2026-08-09  pos rate 0.000  n=2014  split~-
+    test coverage MANT  : 100.0% of hours
+    test coverage DEMI  :  41.9% of hours
+    [stats] 1 station(s) absent for the whole training split; standardized with the identity, and masked out at every hour anyway
+          [!] with a held-out zone, a station absent here is NOT masked at test time --
+              it will be fed raw while the training stations were z-scored. Choose a train
+              window that overlaps the test stations' archive.
+  [model] branch=lstm head=mlp  279,241 parameter(s)
+  [seed 42] epoch 1/40  train loss 0.7626  val loss 0.2280  val AUC nan
+  [seed 42] epoch 2/40  train loss 0.4107  val loss 0.2450  val AUC nan
+  [seed 42] epoch 3/40  train loss 0.2180  val loss 0.3014  val AUC nan
+  [seed 42] epoch 4/40  train loss 0.0884  val loss 0.2640  val AUC nan
+  [seed 42] epoch 5/40  train loss 0.1021  val loss 0.0988  val AUC nan
+  [seed 42] epoch 6/40  train loss 0.0843  val loss 0.0565  val AUC nan
+  [seed 42] epoch 7/40  train loss 0.0743  val loss 0.4388  val AUC nan
+  [seed 42] epoch 8/40  train loss 0.0732  val loss 0.1386  val AUC nan
+  [seed 42] test loss 6.3783  test AUC 0.7888
+  [seed 43] epoch 1/40  train loss 0.8148  val loss 0.2120  val AUC nan
+  [seed 43] epoch 2/40  train loss 0.4007  val loss 0.1375  val AUC nan
+  [seed 43] epoch 3/40  train loss 0.2118  val loss 0.0524  val AUC nan
+  [seed 43] epoch 4/40  train loss 0.1175  val loss 0.1693  val AUC nan
+  [seed 43] epoch 5/40  train loss 0.0935  val loss 0.3361  val AUC nan
+  [seed 43] epoch 6/40  train loss 0.1232  val loss 0.0602  val AUC nan
+  [seed 43] epoch 7/40  train loss 0.0737  val loss 0.2211  val AUC nan
+  [seed 43] epoch 8/40  train loss 0.0240  val loss 0.2294  val AUC nan
+  [seed 43] test loss 9.6543  test AUC 0.5699
+  [seed 44] epoch 1/40  train loss 0.8359  val loss 0.1654  val AUC nan
+  [seed 44] epoch 2/40  train loss 0.5599  val loss 0.2370  val AUC nan
+  [seed 44] epoch 3/40  train loss 0.2149  val loss 0.2508  val AUC nan
+  [seed 44] epoch 4/40  train loss 0.0799  val loss 0.1260  val AUC nan
+  [seed 44] epoch 5/40  train loss 0.1463  val loss 0.2043  val AUC nan
+  [seed 44] epoch 6/40  train loss 0.1331  val loss 0.4277  val AUC nan
+  [seed 44] epoch 7/40  train loss 0.1120  val loss 0.3527  val AUC nan
+  [seed 44] epoch 8/40  train loss 0.0277  val loss 0.4637  val AUC nan
+  [seed 44] test loss 9.2990  test AUC 0.5536
+
+--- Floors (test set) ---
+  base-rate (majority)   AUC 0.5000   n=2487
+  persistence            AUC 0.5027   Brier 0.1359   n=2487
+  -> floor to clear      AUC 0.5027   (oriented: a rule below 0.5 is inverted for free)
+
+--- multistation[features/lstm+mlp] ---
+  per-seed AUC: ['0.7888', '0.5699', '0.5536']  mean 0.6374  spread 0.2352
+  ENSEMBLE (mean of 3 seeds' probabilities)   AUC 0.7180   n=2487
+
+--- multistation[features/lstm+mlp] ensemble (fold 1/5, test set) ---
+  n                    2487
+  accuracy             0.8166
+  balanced_accuracy    0.4752
+  precision            0.0165
+  recall               0.0059
+  f1                   0.0087
+  roc_auc              0.7180
+  pr_auc               0.2113
+  mcc                  -0.0789
+  brier                0.1659
+  log_loss             1.1177
+  brier_skill_score_vs_persistence -0.2208
+  confusion_matrix:
+    [2029, 119]
+    [337, 2]
+
+================================================================
+fold 2/5
+================================================================
+  splits (chronological): train=5316 val=2487 test=2487
+    train: positive rate 0.063
+    val  : positive rate 0.136
+    test : positive rate 0.372
+
+  pos rate over time (equal-width blocks):
+    2024-04-23 .. 2024-07-15  pos rate 0.167  n=2013  split~train
+    2024-07-15 .. 2024-10-07  pos rate 0.000  n=2014  split~train
+    2024-10-07 .. 2024-12-30  pos rate 0.000  n=2013  split~train
+    2024-12-30 .. 2025-03-24  pos rate 0.000  n=2014  split~val
+    2025-03-24 .. 2025-06-16  pos rate 0.335  n=2014  split~test
+    2025-06-16 .. 2025-09-08  pos rate 0.509  n=2013  split~test
+    2025-09-08 .. 2025-12-01  pos rate 0.774  n=2014  split~-
+    2025-12-01 .. 2026-02-23  pos rate 0.313  n=2013  split~-
+    2026-02-23 .. 2026-05-18  pos rate 0.334  n=2014  split~-
+    2026-05-18 .. 2026-08-09  pos rate 0.000  n=2014  split~-
+
+  [!] test pos rate (0.372) is 5.89x train's (0.063) -- likely a swarm or quiet period concentrated in one split rather than the model generalizing. Compare against the floors below (same skew), not against a nominal baseline.
+    test coverage MANT  :  85.3% of hours
+    test coverage DEMI  : 100.0% of hours
+  [model] branch=lstm head=mlp  279,241 parameter(s)
+  [seed 42] epoch 1/40  train loss 1.0910  val loss 8.8279  val AUC 0.7318
+  [seed 42] epoch 2/40  train loss 0.9030  val loss 11.1677  val AUC 0.6376
+  [seed 42] epoch 3/40  train loss 0.4973  val loss 14.5609  val AUC 0.6338
+  [seed 42] epoch 4/40  train loss 0.3346  val loss 16.6017  val AUC 0.6962
+  [seed 42] epoch 5/40  train loss 0.2221  val loss 17.3973  val AUC 0.7134
+  [seed 42] epoch 6/40  train loss 0.2043  val loss 17.2533  val AUC 0.7008
+  [seed 42] epoch 7/40  train loss 0.0928  val loss 19.3445  val AUC 0.6902
+  [seed 42] epoch 8/40  train loss 0.2010  val loss 19.5754  val AUC 0.6742
+  [seed 42] epoch 9/40  train loss 0.0768  val loss 19.7970  val AUC 0.6848
+  [seed 42] test loss 19.1694  test AUC 0.5393
+  [seed 43] epoch 1/40  train loss 1.1802  val loss 7.6986  val AUC 0.6432
+  [seed 43] epoch 2/40  train loss 0.8312  val loss 11.7983  val AUC 0.6902
+  [seed 43] epoch 3/40  train loss 0.4553  val loss 14.4118  val AUC 0.6614
+  [seed 43] epoch 4/40  train loss 0.3382  val loss 16.2083  val AUC 0.6858
+  [seed 43] epoch 5/40  train loss 0.2502  val loss 16.4943  val AUC 0.7080
+  [seed 43] epoch 6/40  train loss 0.2013  val loss 17.5164  val AUC 0.6565
+  [seed 43] epoch 7/40  train loss 0.1867  val loss 18.8197  val AUC 0.7006
+  [seed 43] epoch 8/40  train loss 0.1554  val loss 18.9561  val AUC 0.6616
+  [seed 43] epoch 9/40  train loss 0.0824  val loss 19.7474  val AUC 0.7172
+  [seed 43] epoch 10/40  train loss 0.1257  val loss 20.6845  val AUC 0.7304
+  [seed 43] epoch 11/40  train loss 0.0861  val loss 21.1016  val AUC 0.7264
+  [seed 43] epoch 12/40  train loss 0.0647  val loss 21.9272  val AUC 0.6755
+  [seed 43] epoch 13/40  train loss 0.0883  val loss 21.9923  val AUC 0.6601
+  [seed 43] epoch 14/40  train loss 0.0738  val loss 21.4588  val AUC 0.6779
+  [seed 43] epoch 15/40  train loss 0.0530  val loss 22.5092  val AUC 0.7478
+  [seed 43] epoch 16/40  train loss 0.0706  val loss 22.1102  val AUC 0.7250
+  [seed 43] epoch 17/40  train loss 0.0111  val loss 22.9093  val AUC 0.7079
+  [seed 43] epoch 18/40  train loss 0.0044  val loss 23.6577  val AUC 0.7119
+  [seed 43] epoch 19/40  train loss 0.0420  val loss 23.8041  val AUC 0.7090
+  [seed 43] epoch 20/40  train loss 0.0897  val loss 23.1602  val AUC 0.6988
+  [seed 43] epoch 21/40  train loss 0.0515  val loss 23.0057  val AUC 0.7087
+  [seed 43] epoch 22/40  train loss 0.0020  val loss 23.8669  val AUC 0.7066
+  [seed 43] epoch 23/40  train loss 0.0234  val loss 24.6444  val AUC 0.6932
+  [seed 43] test loss 50.2357  test AUC 0.4773
+  [seed 44] epoch 1/40  train loss 1.1183  val loss 8.7441  val AUC 0.6540
+  [seed 44] epoch 2/40  train loss 0.7609  val loss 10.5575  val AUC 0.7141
+  [seed 44] epoch 3/40  train loss 0.4591  val loss 14.6202  val AUC 0.7056
+  [seed 44] epoch 4/40  train loss 0.2971  val loss 16.1015  val AUC 0.6887
+  [seed 44] epoch 5/40  train loss 0.2830  val loss 16.6513  val AUC 0.6733
+  [seed 44] epoch 6/40  train loss 0.2462  val loss 18.3981  val AUC 0.6364
+  [seed 44] epoch 7/40  train loss 0.2877  val loss 18.4864  val AUC 0.6381
+  [seed 44] epoch 8/40  train loss 0.1041  val loss 19.2555  val AUC 0.6666
+  [seed 44] epoch 9/40  train loss 0.1810  val loss 19.8390  val AUC 0.5863
+  [seed 44] epoch 10/40  train loss 0.1261  val loss 20.2869  val AUC 0.6279
+  [seed 44] test loss 24.1130  test AUC 0.5029
+
+--- Floors (test set) ---
+  base-rate (majority)   AUC 0.5000   n=2487
+  persistence            AUC 0.5290   Brier 0.4057   n=2487
+  -> floor to clear      AUC 0.5290   (oriented: a rule below 0.5 is inverted for free)
+
+--- multistation[features/lstm+mlp] ---
+  per-seed AUC: ['0.5393', '0.4773', '0.5029']  mean 0.5065  spread 0.0620
+  ENSEMBLE (mean of 3 seeds' probabilities)   AUC 0.5441   n=2487
+
+--- multistation[features/lstm+mlp] ensemble (fold 2/5, test set) ---
+  n                    2487
+  accuracy             0.6437
+  balanced_accuracy    0.5288
+  precision            0.6887
+  recall               0.0788
+  f1                   0.1415
+  roc_auc              0.5441
+  pr_auc               0.5023
+  mcc                  0.1381
+  brier                0.3159
+  log_loss             1.4756
+  brier_skill_score_vs_persistence 0.2214
+  confusion_matrix:
+    [1528, 33]
+    [853, 73]
+
+================================================================
+fold 3/5
+================================================================
+  splits (chronological): train=7803 val=2487 test=2487
+    train: positive rate 0.087
+    val  : positive rate 0.372
+    test : positive rate 0.760
+
+  pos rate over time (equal-width blocks):
+    2024-04-23 .. 2024-07-15  pos rate 0.167  n=2013  split~train
+    2024-07-15 .. 2024-10-07  pos rate 0.000  n=2014  split~train
+    2024-10-07 .. 2024-12-30  pos rate 0.000  n=2013  split~train
+    2024-12-30 .. 2025-03-24  pos rate 0.000  n=2014  split~train
+    2025-03-24 .. 2025-06-16  pos rate 0.335  n=2014  split~val
+    2025-06-16 .. 2025-09-08  pos rate 0.509  n=2013  split~val
+    2025-09-08 .. 2025-12-01  pos rate 0.774  n=2014  split~test
+    2025-12-01 .. 2026-02-23  pos rate 0.313  n=2013  split~test
+    2026-02-23 .. 2026-05-18  pos rate 0.334  n=2014  split~-
+    2026-05-18 .. 2026-08-09  pos rate 0.000  n=2014  split~-
+
+  [!] test pos rate (0.760) is 8.78x train's (0.087) -- likely a swarm or quiet period concentrated in one split rather than the model generalizing. Compare against the floors below (same skew), not against a nominal baseline.
+    test coverage MANT  :  79.7% of hours
+    test coverage DEMI  :  67.7% of hours
+  [model] branch=lstm head=mlp  279,241 parameter(s)
+  [seed 42] epoch 1/40  train loss 0.8725  val loss 4.6991  val AUC 0.7136
+  [seed 42] epoch 2/40  train loss 0.6280  val loss 6.9262  val AUC 0.6630
+  [seed 42] epoch 3/40  train loss 0.4820  val loss 7.2606  val AUC 0.6912
+  [seed 42] epoch 4/40  train loss 0.3147  val loss 8.6768  val AUC 0.6806
+  [seed 42] epoch 5/40  train loss 0.3133  val loss 8.4228  val AUC 0.6716
+  [seed 42] epoch 6/40  train loss 0.1948  val loss 8.4470  val AUC 0.6440
+  [seed 42] epoch 7/40  train loss 0.2071  val loss 11.6651  val AUC 0.6662
+  [seed 42] epoch 8/40  train loss 0.1495  val loss 11.5716  val AUC 0.6684
+  [seed 42] epoch 9/40  train loss 0.1310  val loss 12.6936  val AUC 0.6528
+  [seed 42] test loss 24.8073  test AUC 0.5256
+  [seed 43] epoch 1/40  train loss 0.9596  val loss 4.5677  val AUC 0.7185
+  [seed 43] epoch 2/40  train loss 0.7039  val loss 8.0076  val AUC 0.7017
+  [seed 43] epoch 3/40  train loss 0.4973  val loss 8.1063  val AUC 0.7021
+  [seed 43] epoch 4/40  train loss 0.4022  val loss 9.8424  val AUC 0.6562
+  [seed 43] epoch 5/40  train loss 0.2842  val loss 10.5193  val AUC 0.6300
+  [seed 43] epoch 6/40  train loss 0.2204  val loss 12.8269  val AUC 0.6101
+  [seed 43] epoch 7/40  train loss 0.1864  val loss 13.0122  val AUC 0.6257
+  [seed 43] epoch 8/40  train loss 0.2239  val loss 10.1845  val AUC 0.6217
+  [seed 43] epoch 9/40  train loss 0.1643  val loss 12.5166  val AUC 0.6214
+  [seed 43] test loss 26.0216  test AUC 0.4895
+  [seed 44] epoch 1/40  train loss 0.8468  val loss 3.9182  val AUC 0.7322
+  [seed 44] epoch 2/40  train loss 0.6858  val loss 4.7939  val AUC 0.7010
+  [seed 44] epoch 3/40  train loss 0.5165  val loss 6.0217  val AUC 0.6762
+  [seed 44] epoch 4/40  train loss 0.3672  val loss 10.5334  val AUC 0.6465
+  [seed 44] epoch 5/40  train loss 0.2841  val loss 9.8728  val AUC 0.6424
+  [seed 44] epoch 6/40  train loss 0.2883  val loss 12.0691  val AUC 0.6251
+  [seed 44] epoch 7/40  train loss 0.1592  val loss 11.6182  val AUC 0.6088
+  [seed 44] epoch 8/40  train loss 0.1843  val loss 12.9978  val AUC 0.6191
+  [seed 44] epoch 9/40  train loss 0.1336  val loss 15.9322  val AUC 0.6135
+  [seed 44] test loss 29.3573  test AUC 0.5537
+
+--- Floors (test set) ---
+  base-rate (majority)   AUC 0.5000   n=2487
+  persistence            AUC 0.3834   Brier 0.4210   n=2487
+  -> floor to clear      AUC 0.6166   (oriented: a rule below 0.5 is inverted for free)
+
+--- multistation[features/lstm+mlp] ---
+  per-seed AUC: ['0.5256', '0.4895', '0.5537']  mean 0.5230  spread 0.0642
+  ENSEMBLE (mean of 3 seeds' probabilities)   AUC 0.5154   n=2487
+
+--- multistation[features/lstm+mlp] ensemble (fold 3/5, test set) ---
+  n                    2487
+  accuracy             0.3752
+  balanced_accuracy    0.5424
+  precision            0.8370
+  recall               0.2202
+  f1                   0.3487
+  roc_auc              0.5154
+  pr_auc               0.8033
+  mcc                  0.0906
+  brier                0.5734
+  log_loss             2.5005
+  brier_skill_score_vs_persistence -0.3620
+  confusion_matrix:
+    [517, 81]
+    [1473, 416]
+
+================================================================
+fold 4/5
+================================================================
+  splits (chronological): train=10290 val=2487 test=2487
+    train: positive rate 0.156
+    val  : positive rate 0.760
+    test : positive rate 0.427
+
+  pos rate over time (equal-width blocks):
+    2024-04-23 .. 2024-07-15  pos rate 0.167  n=2013  split~train
+    2024-07-15 .. 2024-10-07  pos rate 0.000  n=2014  split~train
+    2024-10-07 .. 2024-12-30  pos rate 0.000  n=2013  split~train
+    2024-12-30 .. 2025-03-24  pos rate 0.000  n=2014  split~train
+    2025-03-24 .. 2025-06-16  pos rate 0.335  n=2014  split~train
+    2025-06-16 .. 2025-09-08  pos rate 0.509  n=2013  split~train
+    2025-09-08 .. 2025-12-01  pos rate 0.774  n=2014  split~val
+    2025-12-01 .. 2026-02-23  pos rate 0.313  n=2013  split~test
+    2026-02-23 .. 2026-05-18  pos rate 0.334  n=2014  split~test
+    2026-05-18 .. 2026-08-09  pos rate 0.000  n=2014  split~-
+
+  [!] test pos rate (0.427) is 2.74x train's (0.156) -- likely a swarm or quiet period concentrated in one split rather than the model generalizing. Compare against the floors below (same skew), not against a nominal baseline.
+    test coverage MANT  :  59.9% of hours
+    test coverage DEMI  :  79.7% of hours
+  [model] branch=lstm head=mlp  279,241 parameter(s)
+  [seed 42] epoch 1/40  train loss 0.6624  val loss 13.5586  val AUC 0.4730
+  [seed 42] epoch 2/40  train loss 0.4715  val loss 16.3957  val AUC 0.5712
+  [seed 42] epoch 3/40  train loss 0.3883  val loss 19.2185  val AUC 0.5804
+  [seed 42] epoch 4/40  train loss 0.3072  val loss 19.2187  val AUC 0.5498
+  [seed 42] epoch 5/40  train loss 0.2644  val loss 23.6048  val AUC 0.5812
+  [seed 42] epoch 6/40  train loss 0.2069  val loss 26.0978  val AUC 0.5759
+  [seed 42] epoch 7/40  train loss 0.1857  val loss 26.6800  val AUC 0.5426
+  [seed 42] epoch 8/40  train loss 0.1416  val loss 29.1746  val AUC 0.5317
+  [seed 42] epoch 9/40  train loss 0.1356  val loss 31.7254  val AUC 0.5344
+  [seed 42] epoch 10/40  train loss 0.1505  val loss 31.7277  val AUC 0.5742
+  [seed 42] epoch 11/40  train loss 0.1013  val loss 29.6607  val AUC 0.5172
+  [seed 42] epoch 12/40  train loss 0.1072  val loss 31.3613  val AUC 0.5404
+  [seed 42] epoch 13/40  train loss 0.0729  val loss 35.6213  val AUC 0.5925
+  [seed 42] epoch 14/40  train loss 0.0528  val loss 37.7963  val AUC 0.5391
+  [seed 42] epoch 15/40  train loss 0.0580  val loss 39.1510  val AUC 0.5964
+  [seed 42] epoch 16/40  train loss 0.0563  val loss 36.7737  val AUC 0.5541
+  [seed 42] epoch 17/40  train loss 0.0527  val loss 36.2621  val AUC 0.5485
+  [seed 42] epoch 18/40  train loss 0.0473  val loss 38.0913  val AUC 0.5474
+  [seed 42] epoch 19/40  train loss 0.0461  val loss 36.2110  val AUC 0.5760
+  [seed 42] epoch 20/40  train loss 0.0503  val loss 37.9058  val AUC 0.5603
+  [seed 42] epoch 21/40  train loss 0.0257  val loss 39.3228  val AUC 0.5010
+  [seed 42] epoch 22/40  train loss 0.0378  val loss 37.6901  val AUC 0.5158
+  [seed 42] epoch 23/40  train loss 0.0132  val loss 40.4749  val AUC 0.5551
+  [seed 42] test loss 25.9061  test AUC 0.4313
+  [seed 43] epoch 1/40  train loss 0.6726  val loss 12.2843  val AUC 0.4930
+  [seed 43] epoch 2/40  train loss 0.4687  val loss 15.9101  val AUC 0.5200
+  [seed 43] epoch 3/40  train loss 0.4196  val loss 19.6548  val AUC 0.5525
+  [seed 43] epoch 4/40  train loss 0.3030  val loss 22.3460  val AUC 0.5371
+  [seed 43] epoch 5/40  train loss 0.2793  val loss 22.1576  val AUC 0.5055
+  [seed 43] epoch 6/40  train loss 0.2331  val loss 26.8560  val AUC 0.4953
+  [seed 43] epoch 7/40  train loss 0.2005  val loss 26.9151  val AUC 0.4896
+  [seed 43] epoch 8/40  train loss 0.1415  val loss 29.9105  val AUC 0.5324
+  [seed 43] epoch 9/40  train loss 0.1254  val loss 32.9157  val AUC 0.5503
+  [seed 43] epoch 10/40  train loss 0.1267  val loss 33.6047  val AUC 0.6124
+  [seed 43] epoch 11/40  train loss 0.1211  val loss 30.9531  val AUC 0.5578
+  [seed 43] epoch 12/40  train loss 0.0896  val loss 34.5105  val AUC 0.5895
+  [seed 43] epoch 13/40  train loss 0.0847  val loss 31.4115  val AUC 0.6231
+  [seed 43] epoch 14/40  train loss 0.0828  val loss 33.5860  val AUC 0.6236
+  [seed 43] epoch 15/40  train loss 0.0797  val loss 35.0226  val AUC 0.5579
+  [seed 43] epoch 16/40  train loss 0.0603  val loss 38.9799  val AUC 0.6065
+  [seed 43] epoch 17/40  train loss 0.0608  val loss 36.9047  val AUC 0.5424
+  [seed 43] epoch 18/40  train loss 0.0415  val loss 37.9861  val AUC 0.5326
+  [seed 43] epoch 19/40  train loss 0.0458  val loss 42.7532  val AUC 0.5039
+  [seed 43] epoch 20/40  train loss 0.0331  val loss 35.5425  val AUC 0.4799
+  [seed 43] epoch 21/40  train loss 0.0329  val loss 41.7746  val AUC 0.4978
+  [seed 43] epoch 22/40  train loss 0.0386  val loss 38.7096  val AUC 0.5418
+  [seed 43] test loss 23.0254  test AUC 0.5144
+  [seed 44] epoch 1/40  train loss 0.6744  val loss 13.3436  val AUC 0.5677
+  [seed 44] epoch 2/40  train loss 0.4715  val loss 16.1148  val AUC 0.5647
+  [seed 44] epoch 3/40  train loss 0.4061  val loss 18.5839  val AUC 0.5800
+  [seed 44] epoch 4/40  train loss 0.3223  val loss 19.3396  val AUC 0.5493
+  [seed 44] epoch 5/40  train loss 0.2735  val loss 23.2627  val AUC 0.5233
+  [seed 44] epoch 6/40  train loss 0.2395  val loss 25.3421  val AUC 0.5550
+  [seed 44] epoch 7/40  train loss 0.1982  val loss 24.7506  val AUC 0.5861
+  [seed 44] epoch 8/40  train loss 0.1823  val loss 31.4137  val AUC 0.5497
+  [seed 44] epoch 9/40  train loss 0.1080  val loss 33.0973  val AUC 0.5541
+  [seed 44] epoch 10/40  train loss 0.1094  val loss 33.0013  val AUC 0.5969
+  [seed 44] epoch 11/40  train loss 0.0953  val loss 32.5969  val AUC 0.5699
+  [seed 44] epoch 12/40  train loss 0.0793  val loss 36.0112  val AUC 0.5943
+  [seed 44] epoch 13/40  train loss 0.0940  val loss 35.8595  val AUC 0.5691
+  [seed 44] epoch 14/40  train loss 0.0560  val loss 36.4588  val AUC 0.6227
+  [seed 44] epoch 15/40  train loss 0.0823  val loss 31.4320  val AUC 0.6037
+  [seed 44] epoch 16/40  train loss 0.0529  val loss 37.1021  val AUC 0.5601
+  [seed 44] epoch 17/40  train loss 0.0421  val loss 39.6110  val AUC 0.5663
+  [seed 44] epoch 18/40  train loss 0.0496  val loss 35.3299  val AUC 0.5755
+  [seed 44] epoch 19/40  train loss 0.0525  val loss 34.7555  val AUC 0.5848
+  [seed 44] epoch 20/40  train loss 0.0391  val loss 35.4647  val AUC 0.5867
+  [seed 44] epoch 21/40  train loss 0.0364  val loss 37.1446  val AUC 0.6158
+  [seed 44] epoch 22/40  train loss 0.0370  val loss 36.1851  val AUC 0.6135
+  [seed 44] test loss 26.2711  test AUC 0.5327
+
+--- Floors (test set) ---
+  base-rate (majority)   AUC 0.5000   n=2487
+  persistence            AUC 0.2681   Brier 0.7000   n=2487
+  -> floor to clear      AUC 0.7319   (oriented: a rule below 0.5 is inverted for free)
+
+--- multistation[features/lstm+mlp] ---
+  per-seed AUC: ['0.4313', '0.5144', '0.5327']  mean 0.4928  spread 0.1014
+  ENSEMBLE (mean of 3 seeds' probabilities)   AUC 0.5166   n=2487
+
+--- multistation[features/lstm+mlp] ensemble (fold 4/5, test set) ---
+  n                    2487
+  accuracy             0.5682
+  balanced_accuracy    0.4976
+  precision            0.3571
+  recall               0.0141
+  f1                   0.0272
+  roc_auc              0.5166
+  pr_auc               0.4258
+  mcc                  -0.0185
+  brier                0.4218
+  log_loss             4.3996
+  brier_skill_score_vs_persistence 0.3975
+  confusion_matrix:
+    [1398, 27]
+    [1047, 15]
+
+================================================================
+fold 5/5
+================================================================
+  splits (chronological): train=12777 val=2487 test=2487
+    train: positive rate 0.273
+    val  : positive rate 0.427
+    test : positive rate 0.000
+
+  pos rate over time (equal-width blocks):
+    2024-04-23 .. 2024-07-15  pos rate 0.167  n=2013  split~train
+    2024-07-15 .. 2024-10-07  pos rate 0.000  n=2014  split~train
+    2024-10-07 .. 2024-12-30  pos rate 0.000  n=2013  split~train
+    2024-12-30 .. 2025-03-24  pos rate 0.000  n=2014  split~train
+    2025-03-24 .. 2025-06-16  pos rate 0.335  n=2014  split~train
+    2025-06-16 .. 2025-09-08  pos rate 0.509  n=2013  split~train
+    2025-09-08 .. 2025-12-01  pos rate 0.774  n=2014  split~train
+    2025-12-01 .. 2026-02-23  pos rate 0.313  n=2013  split~val
+    2026-02-23 .. 2026-05-18  pos rate 0.334  n=2014  split~val
+    2026-05-18 .. 2026-08-09  pos rate 0.000  n=2014  split~test
+
+  [!] test pos rate (0.000) is 0.00x train's (0.273) -- likely a swarm or quiet period concentrated in one split rather than the model generalizing. Compare against the floors below (same skew), not against a nominal baseline.
+    test coverage MANT  : 100.0% of hours
+    test coverage DEMI  :  99.6% of hours
+  [model] branch=lstm head=mlp  279,241 parameter(s)
+  [seed 42] epoch 1/40  train loss 0.5791  val loss 3.3805  val AUC 0.4964
+  [seed 42] epoch 2/40  train loss 0.3894  val loss 3.5971  val AUC 0.4886
+  [seed 42] epoch 3/40  train loss 0.3177  val loss 4.2279  val AUC 0.5023
+  [seed 42] epoch 4/40  train loss 0.2454  val loss 5.8881  val AUC 0.4897
+  [seed 42] epoch 5/40  train loss 0.2031  val loss 6.8036  val AUC 0.5124
+  [seed 42] epoch 6/40  train loss 0.1842  val loss 6.8515  val AUC 0.4658
+  [seed 42] epoch 7/40  train loss 0.1520  val loss 8.5835  val AUC 0.5198
+  [seed 42] epoch 8/40  train loss 0.1307  val loss 7.1260  val AUC 0.4758
+  [seed 42] epoch 9/40  train loss 0.1168  val loss 7.8038  val AUC 0.4891
+  [seed 42] epoch 10/40  train loss 0.0977  val loss 7.8355  val AUC 0.4693
+  [seed 42] epoch 11/40  train loss 0.0781  val loss 8.0074  val AUC 0.4686
+  [seed 42] epoch 12/40  train loss 0.0769  val loss 9.5997  val AUC 0.4772
+  [seed 42] epoch 13/40  train loss 0.0688  val loss 8.4820  val AUC 0.4637
+  [seed 42] epoch 14/40  train loss 0.0574  val loss 9.1035  val AUC 0.4796
+  [seed 42] epoch 15/40  train loss 0.0515  val loss 10.2951  val AUC 0.4745
+  [seed 42] test loss 0.6066  test AUC nan
+  [seed 43] epoch 1/40  train loss 0.5830  val loss 3.2817  val AUC 0.4625
+  [seed 43] epoch 2/40  train loss 0.3891  val loss 4.8586  val AUC 0.4684
+  [seed 43] epoch 3/40  train loss 0.3041  val loss 4.6995  val AUC 0.4736
+  [seed 43] epoch 4/40  train loss 0.2590  val loss 4.9182  val AUC 0.5010
+  [seed 43] epoch 5/40  train loss 0.2014  val loss 6.5662  val AUC 0.4727
+  [seed 43] epoch 6/40  train loss 0.1855  val loss 6.0720  val AUC 0.4856
+  [seed 43] epoch 7/40  train loss 0.1551  val loss 7.2224  val AUC 0.4922
+  [seed 43] epoch 8/40  train loss 0.1154  val loss 8.2989  val AUC 0.4807
+  [seed 43] epoch 9/40  train loss 0.1083  val loss 8.7144  val AUC 0.4687
+  [seed 43] epoch 10/40  train loss 0.1054  val loss 9.1689  val AUC 0.4697
+  [seed 43] epoch 11/40  train loss 0.0961  val loss 8.4536  val AUC 0.4564
+  [seed 43] epoch 12/40  train loss 0.0822  val loss 9.5900  val AUC 0.4482
+  [seed 43] test loss 2.7892  test AUC nan
+  [seed 44] epoch 1/40  train loss 0.5765  val loss 2.6388  val AUC 0.4937
+  [seed 44] epoch 2/40  train loss 0.3728  val loss 3.7749  val AUC 0.4859
+  [seed 44] epoch 3/40  train loss 0.2917  val loss 5.8676  val AUC 0.4838
+  [seed 44] epoch 4/40  train loss 0.2509  val loss 6.2459  val AUC 0.5021
+  [seed 44] epoch 5/40  train loss 0.1985  val loss 5.9987  val AUC 0.4865
+  [seed 44] epoch 6/40  train loss 0.1765  val loss 6.5460  val AUC 0.4931
+  [seed 44] epoch 7/40  train loss 0.1615  val loss 7.0982  val AUC 0.4799
+  [seed 44] epoch 8/40  train loss 0.1329  val loss 9.2834  val AUC 0.4867
+  [seed 44] epoch 9/40  train loss 0.1122  val loss 8.9336  val AUC 0.4687
+  [seed 44] epoch 10/40  train loss 0.1000  val loss 9.1214  val AUC 0.4775
+  [seed 44] epoch 11/40  train loss 0.0818  val loss 9.6743  val AUC 0.4377
+  [seed 44] epoch 12/40  train loss 0.0830  val loss 10.1379  val AUC 0.4425
+/home/oguzb/Projects/sismokaos/waveform_forecast/.venv/lib/python3.12/site-packages/sklearn/metrics/_classification.py:2939: UserWarning: y_pred contains classes not in y_true
+  warnings.warn("y_pred contains classes not in y_true")
+  [seed 44] test loss 0.7517  test AUC nan
+
+--- Floors (test set) ---
+  base-rate (majority)   AUC nan   n=2487
+  persistence            AUC nan   Brier nan   n=2487
+  -> floor to clear      AUC 0.5000   (oriented: a rule below 0.5 is inverted for free)
+
+--- multistation[features/lstm+mlp] ---
+  per-seed AUC: ['nan', 'nan', 'nan']  mean nan  spread nan
+  ENSEMBLE (mean of 3 seeds' probabilities)   AUC nan   n=2487
+
+--- multistation[features/lstm+mlp] ensemble (fold 5/5, test set) ---
+  n                    2487
+  accuracy             0.7616
+  balanced_accuracy    0.7616
+  precision            0.0000
+  recall               0.0000
+  f1                   0.0000
+  roc_auc              nan
+  pr_auc               nan
+  mcc                  nan
+  brier                nan
+  log_loss             nan
+  brier_skill_score_vs_persistence nan
+  confusion_matrix:
+    [1894, 593]
+    [0, 0]
+
+================================================================
+Walk-forward CV summary (5/5 folds)
+================================================================
+  ensemble AUC per fold: ['0.7180', '0.5441', '0.5154', '0.5166', 'nan']
+  ensemble AUC:  mean 0.5735  std 0.0842
+  floor AUC:     mean 0.5760  std 0.0887
+  beats its own fold's floor in 2/5 folds
+  [!] fold spread exceeds the margin over the floor -- read the per-fold column,
+      not the mean. This is the condition under which a pooled number misleads.

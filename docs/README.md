@@ -82,7 +82,7 @@ waveform-forecast train --mode regress --features hourly.parquet \
     --catalog-path cnn_earthquake/catalogs/catalog_current.csv \
     --keep-features Z_STA_LTA_Max_max EN_CROSS_CORR_mean --cv-folds 5
 
-uv run pytest        # 161 tests
+uv run pytest        # 188 tests
 ```
 
 ## Read this expecting a negative
@@ -93,5 +93,8 @@ features beat persistence — 0 of 10 chaos-sweep cells, all three sequence
 architectures below floor. Multi-station pooling is a genuine difference from
 those runs, and so is the raw arm, which had never actually run before.
 
-Nine walk-forward runs later, every one of them sits below its own floor. See
+Thirteen walk-forward runs later, only two sit above their own floor — and both
+by less than their fold spread. The most useful finding is about the model
+rather than the data: **the recurrent branch is harmful here**, and deleting it
+(214k of 279k parameters) improved every summary statistic. See
 [performance.md](performance.md).

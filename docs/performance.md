@@ -1,12 +1,17 @@
 # Measured performance
 
-**Headline: the model does not beat its floor.** Across nine walk-forward runs on
-the four-station archive, **every run's mean AUC sat below its mean floor**, and
-in every run the fold-to-fold spread exceeded the margin over the floor — the
-condition under which a pooled number misleads. This matches the project's prior
-negative result and does not overturn it.
+**Headline: the model does not beat its floor.** Across thirteen walk-forward
+runs on the four-station archive, only two put a mean AUC above its mean floor,
+and both did so by a margin smaller than their own fold spread — the condition
+under which a pooled number misleads. This matches the project's prior negative
+result and does not overturn it.
 
-Four things were varied, and none of them changed the conclusion:
+**The single most useful finding is negative about the model, not the data: the
+recurrent branch is not merely unnecessary, it is harmful.** Deleting it
+outright — 214,000 of 279,000 parameters — improved every summary statistic.
+See § The capacity ladder.
+
+Five things were varied, and none of them produced a forecast:
 
 | lever | runs | outcome |
 |---|---|---|
@@ -14,6 +19,7 @@ Four things were varied, and none of them changed the conclusion:
 | **region-local labels + a rate target** | 4–5 | model at **chance** in both tectonic zones |
 | **more features** (2 → 207) | 6–7 | no gain; on the identical rate label, *worse* |
 | **raw waveforms instead of aggregates** | 8 vs 9 | the CNN tracks the aggregates fold for fold, and ends *below* them |
+| **less model** (279k → 65k params) | 10–13 | the only change to lift a mean above its floor, and monotone: every rung down improved it |
 
 One lever did move the model toward its bar without ever clearing it: shortening
 the temporal context from 24 h to 8 h closed the gap from −0.050 to −0.003
@@ -27,8 +33,9 @@ Everything below is from runs executed on 2026-09-12. The raw console logs are i
 [`runs/`](runs/) — `classify_mant_demi.log`, `classify_4sta.log`,
 `regress_mant_demi.log`, `rate_marmara_inzone.log`, `rate_aegean_inzone.log`,
 `rate_aegean_wide207.log`, `classify_aegean_wide207.log`,
-`raw_aegean_classify.log`, `feat_seq8_control.log`, `waveforms_extract.log` —
-and every number here is copied from them rather than recomputed.
+`raw_aegean_classify.log`, `feat_seq8_control.log`, `waveforms_extract.log`,
+`ladder_seq8_{mean_linear,mean_mlp,gru_mlp,lstm_mlp}.log` — and every number here
+is copied from them rather than recomputed.
 
 ## The corpus
 
@@ -423,6 +430,62 @@ response and instrument gain. That is precisely what per-(station, channel)
 standardization exists for, and pooling one shared statistic across stations
 would have destroyed it.
 
+## Runs 10–13 — the capacity ladder
+
+The branch is the largest single component of the network — 108,288 of the
+feature arm's 279,241 parameters, ten times the raw CNN — and the M≥4.5 label is
+driven by about **30 qualifying events** in the archive span. That is thousands
+of parameters per event, and the overfitting is plain in every log: train loss
+0.58 → 0.05 while val loss climbs 3.3 → 10.3, with val AUC never leaving
+0.46–0.50.
+
+So the rungs go **down**, with a cell swap as one of them rather than the whole
+experiment. All four are identical but for `--branch` / `--head`: same zone, same
+region-local label, same folds, same floors, `--seq-hours 8`.
+
+| rung | params | **mean AUC** | vs floor 0.5760 | folds |
+|---|---:|---:|---:|:-:|
+| `mean` + `linear` | 65,206 | **0.6024** | **+0.026** | 2/5 |
+| `mean` + `mlp` | 78,375 | **0.6027** | **+0.027** | 2/5 |
+| `gru` + `mlp` | 244,297 | 0.5185 | −0.058 | 1/5 |
+| `lstm` + `mlp` (default) | 279,241 | 0.5735 | −0.003 | 2/5 |
+
+**The ladder is inverted.** Both no-recurrence rungs beat both recurrent ones,
+and they are the first runs in this document whose mean sits above its floor.
+The 214,000 parameters between the ends were doing worse than nothing.
+
+The `lstm` rung reproduces Run 9 to four decimals (0.7180, 0.5441, 0.5154,
+0.5166), so the ladder is a controlled comparison and not a re-tuning.
+
+### Why this is still not a forecast
+
+Per fold, the winning rung:
+
+| fold | floor | `mean`+`linear` |
+|---|---:|---:|
+| 1 | 0.5027 | **0.8426** ✅ |
+| 2 | 0.5290 | **0.5670** ✅ |
+| 3 | 0.6166 | 0.5143 ❌ |
+| 4 | 0.7319 | 0.4857 ❌ |
+| 5 | 0.5000 | nan — |
+
+The shape is unchanged from all ten previous runs: **clear the two low floors,
+fail the two high ones.** And the margin is carried entirely by fold 1 — the fold
+whose validation block is all-negative, where `val AUC` is NaN every epoch, no
+checkpoint is ever selected, and the scored model is whatever `--patience 8` left
+behind. Remove fold 1 and the mean falls back below the floor.
+
+Both winning rungs trip the spread warning: std 0.14 against a margin of 0.026.
+The code is saying not to read the mean, and it is right.
+
+### On the GRU rung specifically
+
+It finished last (0.5185, 1/5 folds) — within the spread of the others, so not
+strong evidence against GRUs as such, but it settles the question it was added to
+answer. A 3-gate cell saves ~35,000 parameters where the gap between the ends of
+the ladder is 214,000. **The direction that helped was removing recurrence, not
+making it cheaper.**
+
 ## Caveats that change how these numbers read
 
 Three, all visible in the logs, none of which the summary line captures:
@@ -473,8 +536,14 @@ of this configuration could have reported anything from "well below chance" to
 - Test the **spatial holdout**. `--test-stations` is implemented and tested
   (`tests/test_spatial_holdout.py`), but running it would be premature: there is
   no in-zone signal in either zone to transfer.
-- Explore sequence length properly. 8 h beat 24 h; 1–4 h was never tried, and it
-  is now the only lever with evidence behind it.
+- Explore sequence length properly. 8 h beat 24 h; 1–4 h was never tried. With
+  the `mean` branch winning, `--seq-hours 4` is the natural next rung — the
+  smallest honest version of this model.
+- Re-run the earlier comparisons on the `mean` branch. Runs 1–9 all used the
+  recurrent branch that rungs 10–13 show to be harmful, so the multi-station,
+  region-local and raw-vs-aggregate questions were each decided with a handicap
+  applied equally to both sides. That does not reverse any of them, but none has
+  been asked of the better model.
 
 ## Reproducing
 

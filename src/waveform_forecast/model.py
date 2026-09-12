@@ -32,7 +32,7 @@ the single-station models.
 import torch
 import torch.nn as nn
 
-from waveform_forecast.blocks import LSTMAttentionBranch
+from waveform_forecast.blocks import BRANCHES, LSTMAttentionBranch
 
 
 class MaskedStationPool(nn.Module):
@@ -96,7 +96,7 @@ class MultiStationForecaster(nn.Module):
     """Per-station encoder -> masked pool over stations -> LSTM over hours -> logit."""
 
     def __init__(self, feat_dim, hidden=64, dropout=0.3, encoder=None,
-                 proj_dim=None):
+                 proj_dim=None, branch="lstm", head="mlp"):
         """Initializes the encoder, pool, recurrent branch and head.
 
         Args:
@@ -112,6 +112,13 @@ class MultiStationForecaster(nn.Module):
                 Defaults to `feat_dim`. Giving the pool a learned projection
                 matters when stations differ in scale, which they do -- site
                 response is a property of the station, not the earthquake.
+            branch: Which temporal model runs over the hour axis -- "lstm" (the
+                ported LSTM+attention branch, 108k parameters), "gru" (the same
+                architecture with a 3-gate cell, 98k), or "mean" (no temporal
+                model at all, 0). See `blocks.BRANCHES`.
+            head: "mlp" is the two-layer head; "linear" is a single Linear off
+                the branch output. The rung below "mean"+"mlp": with both, the
+                model is a pooled linear probe and nothing else.
         """
         super().__init__()
         self.encoder = encoder
@@ -119,15 +126,25 @@ class MultiStationForecaster(nn.Module):
         self.project = nn.Sequential(nn.Linear(feat_dim, dim), nn.GELU(),
                                      nn.Dropout(dropout))
         self.pool = MaskedStationPool(dim)
-        self.branch = LSTMAttentionBranch(dim, hidden=hidden, dropout=dropout)
-        self.head = nn.Sequential(
-            nn.LayerNorm(self.branch.out_dim),
-            nn.Dropout(dropout),
-            nn.Linear(self.branch.out_dim, hidden),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden, 1),
-        )
+        if branch not in BRANCHES:
+            raise ValueError(f"branch must be one of {sorted(BRANCHES)}, "
+                             f"got {branch!r}")
+        self.branch = BRANCHES[branch](dim, hidden=hidden, dropout=dropout)
+        d = self.branch.out_dim
+        if head == "linear":
+            self.head = nn.Sequential(nn.LayerNorm(d), nn.Dropout(dropout),
+                                      nn.Linear(d, 1))
+        elif head == "mlp":
+            self.head = nn.Sequential(
+                nn.LayerNorm(d),
+                nn.Dropout(dropout),
+                nn.Linear(d, hidden),
+                nn.GELU(),
+                nn.Dropout(dropout),
+                nn.Linear(hidden, 1),
+            )
+        else:
+            raise ValueError(f"head must be 'linear' or 'mlp', got {head!r}")
         self.last_weights = None
 
     def forward(self, x, present):
