@@ -66,7 +66,7 @@ def stack(frame, stations):
     return x, present, feats
 
 
-def fit_stats(x, present, indices, seq_hours):
+def fit_stats(x, present, indices, seq_hours, all_station_rows=True):
     """Per-(station, feature) mean and std over the training windows' present hours.
 
     Sampled across the whole training split rather than its opening rows: a
@@ -74,11 +74,48 @@ def fit_stats(x, present, indices, seq_hours):
     archive, and standardizing by statistics taken there understated the true
     spread by up to 52x in this project's single-station work -- producing
     z-scores over 100 and a model whose best checkpoint was the untrained one.
+
+    **`all_station_rows` is what makes a spatial holdout standardizable.** With
+    a held-out ZONE, the test stations appear in no training window at all, so
+    the per-station statistics for them would be all-NaN and fall back to the
+    identity -- their features would reach the model raw while the training
+    stations' arrived z-scored, and the run would be measuring a scaling
+    mismatch rather than transfer.
+
+    The fix is not to pool one shared statistic across stations (site response
+    is a property of the station, which is why these are per-station in the
+    first place), nor to fit the held-out station on its own test-period data
+    (that is the evaluation split's distribution entering the model). It is to
+    fit every station on **its own hours inside the training TIME window**. The
+    Marmara stations were recording throughout the Aegean training period; they
+    were simply not the labelled zone. Those hours are theirs, they are in the
+    past relative to the test block, and they carry no label at all -- so using
+    them costs nothing and preserves the per-station scaling.
+
+    Args:
+        x: (hours, stations, features), NaN where absent.
+        present: (hours, stations) bool.
+        indices: TRAIN window end-indices.
+        seq_hours: Hours per window.
+        all_station_rows: Fit every station over the training window's hour
+            RANGE, rather than only over the hours its own windows covered.
+            Identical for a station whose windows span the split; the
+            difference is exactly the held-out-zone case. False restores the
+            pre-spatial behaviour.
+
+    Returns:
+        (mu, sd), each (stations, features) float32.
     """
     take = indices[np.linspace(0, len(indices) - 1,
                                min(500, len(indices))).astype(int)]
     rows = np.unique(np.concatenate(
         [np.arange(max(0, i - seq_hours + 1), i + 1) for i in take]))
+    if all_station_rows and len(rows):
+        # The contiguous hour span the training windows cover. A station absent
+        # from the training ZONE still has its own readings in here, and those
+        # are what standardize it. Bounded by the train window's own extent, so
+        # nothing after the split boundary is ever touched.
+        rows = np.arange(int(rows.min()), int(rows.max()) + 1)
     sub, msk = x[rows], present[rows]
     wide = np.where(msk[..., None], sub, np.nan)
     # A station can be absent for an ENTIRE training split and that is not an
@@ -96,6 +133,16 @@ def fit_stats(x, present, indices, seq_hours):
         print(f"    [stats] {int(absent.sum())} station(s) absent for the whole "
               f"training split; standardized with the identity, and masked out "
               f"at every hour anyway")
+        if all_station_rows:
+            # In a spatial holdout this is no longer harmless. A held-out
+            # station that is also absent from the training TIME window has no
+            # honest statistics available, and the identity means it reaches
+            # the model unstandardized rather than masked away.
+            print(f"          [!] with a held-out zone, a station absent here "
+                  f"is NOT masked at test time --\n              it will be fed "
+                  f"raw while the training stations were z-scored. Choose a "
+                  f"train\n              window that overlaps the test "
+                  f"stations' archive.")
     mu = np.where(np.isfinite(mu), mu, 0.0).astype(np.float32)
     sd = np.where(np.isfinite(sd) & (sd > 1e-8), sd, 1.0).astype(np.float32)
     return mu, sd
@@ -104,7 +151,8 @@ def fit_stats(x, present, indices, seq_hours):
 class MultiStationWindows(Dataset):
     """Windows of (time, stations, features), the mask, and the label."""
 
-    def __init__(self, x, present, labels, seq_hours, indices, stats):
+    def __init__(self, x, present, labels, seq_hours, indices, stats,
+                 station_idx=None):
         """Builds the dataset.
 
         Args:
@@ -116,10 +164,25 @@ class MultiStationWindows(Dataset):
             stats: (mu, sd) from `fit_stats` on the TRAINING split. Val and test
                 must reuse them; fitting their own would let the evaluation
                 split's distribution into the model.
+            station_idx: Positions on the station axis this split uses, or None
+                for all of them. A spatial holdout trains on one zone's slice
+                and tests on another's; `MaskedStationPool` is attention over
+                the station axis and shares one projection across stations, so
+                the two slices need not be the same width and no part of the
+                model is tied to a particular station's position.
         """
         self.x, self.present, self.labels = x, present, labels
         self.seq_hours, self.indices = seq_hours, indices
-        self.mu, self.sd = stats
+        mu, sd = stats
+        self.station_idx = station_idx
+        if station_idx is not None:
+            k = np.asarray(station_idx, dtype=np.int64)
+            # Slice x/present/stats once here rather than per __getitem__: the
+            # same three lines in the hot path cost a fancy-index copy on every
+            # sample, and the arrays are views until something writes to them.
+            self.x, self.present = x[:, k], present[:, k]
+            mu, sd = mu[k], sd[k]
+        self.mu, self.sd = mu, sd
 
     def __len__(self):
         return len(self.indices)

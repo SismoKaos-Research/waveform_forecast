@@ -106,3 +106,13 @@ floor.
 ```bash
 uv run pytest
 ```
+
+## Documentation
+
+`docs/` holds the full write-up: [architecture](docs/architecture.md), the
+[data pipeline](docs/data-pipeline.md),
+[labels and splits](docs/labels-and-splits.md),
+[evaluation](docs/evaluation.md), a [CLI reference](docs/cli.md), and
+**[measured performance](docs/performance.md)** — three 5-fold walk-forward runs
+on the four-station archive, per fold, against the floor, with the raw logs in
+`docs/runs/`. Short version: 1/5, 1/5 and 0/5 folds cleared their own floor.

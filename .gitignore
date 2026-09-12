@@ -13,3 +13,9 @@ wheels/
 runs/
 *.pth
 *.parquet
+
+# ...except the console logs docs/performance.md quotes its numbers from. They
+# are the evidence for every figure in it, and a reported result whose log is
+# untracked cannot be checked against the code that produced it.
+!docs/runs/
+!docs/runs/*.log

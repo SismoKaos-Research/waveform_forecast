@@ -1,0 +1,443 @@
+  2,890 hour(s) past the last M>=4.5 event (2026-04-11T14:31:56.000000) have no next event and are dropped —
+      right-censored, not quiet
+  20,136 hourly rows, 2 station(s), 2 feature(s) each
+  wait to next M>=4.5: median 15.53 d, mean 33.20 d (uncapped; the split is purged per hour instead)
+    MANT   present  88.0% of hours
+    DEMI   present  64.0% of hours
+    any    present  98.4%   <- what the masked model trains on
+    all    present  53.6%   <- what an intersection-only model would get
+  dropped 2,890 right-censored window(s) past the last qualifying event
+  16,919 usable window(s) of 20,113
+  device cuda, seeds [42, 43, 44], arm=features, mode=regress, embargo 23h
+
+================================================================
+fold 1/5
+================================================================
+  purged by label span: 564 train and 2,394 val hour(s) whose next event
+      falls in a later block (23.3% of train)
+  splits (chronological): train=1853 val=0 test=2394
+    train: median wait  12.87 d   censored   0.0%
+    test : median wait  22.46 d   censored   0.0%
+
+  mean wait (d) over time (equal-width blocks):
+    2024-04-23 .. 2024-07-15  mean wait (d) 17.132  n=2013  split~train
+    2024-07-15 .. 2024-10-07  mean wait (d) 133.357  n=2014  split~train
+    2024-10-07 .. 2024-12-30  mean wait (d) 64.110  n=2013  split~test
+    2024-12-30 .. 2025-03-24  mean wait (d) 12.137  n=2014  split~test
+    2025-03-24 .. 2025-06-16  mean wait (d) 10.220  n=2014  split~-
+    2025-06-16 .. 2025-09-08  mean wait (d) 10.552  n=2013  split~-
+    2025-09-08 .. 2025-12-01  mean wait (d) 7.647  n=2014  split~-
+    2025-12-01 .. 2026-02-23  mean wait (d) 21.356  n=2013  split~-
+    2026-02-23 .. 2026-05-18  mean wait (d) 13.807  n=2014  split~-
+    2026-05-18 .. 2026-08-09  mean wait (d) nan  n=2014  split~-
+    test coverage MANT  : 100.0% of hours
+    test coverage DEMI  :  37.8% of hours
+    [stats] 1 station(s) absent for the whole training split; standardized with the identity, and masked out at every hour anyway
+/home/oguzb/Projects/sismokaos/waveform_forecast/.venv/lib/python3.12/site-packages/numpy/_core/fromnumeric.py:3862: RuntimeWarning: Mean of empty slice
+  return _methods._mean(a, axis=axis, dtype=dtype,
+/home/oguzb/Projects/sismokaos/waveform_forecast/.venv/lib/python3.12/site-packages/numpy/_core/_methods.py:142: RuntimeWarning: invalid value encountered in scalar divide
+  ret = ret.dtype.type(ret / rcount)
+  [seed 42] epoch 1/40  train loss 0.6044  val loss nan  val MAE nan d  val rho +nan
+  [seed 42] epoch 2/40  train loss 0.3779  val loss nan  val MAE nan d  val rho +nan
+  [seed 42] epoch 3/40  train loss 0.3776  val loss nan  val MAE nan d  val rho +nan
+  [seed 42] epoch 4/40  train loss 0.3654  val loss nan  val MAE nan d  val rho +nan
+  [seed 42] epoch 5/40  train loss 0.3471  val loss nan  val MAE nan d  val rho +nan
+  [seed 42] epoch 6/40  train loss 0.3567  val loss nan  val MAE nan d  val rho +nan
+  [seed 42] epoch 7/40  train loss 0.3506  val loss nan  val MAE nan d  val rho +nan
+  [seed 42] epoch 8/40  train loss 0.3517  val loss nan  val MAE nan d  val rho +nan
+  [seed 42] test loss 1.5131  test MAE 21.025 d  test rho -0.2623
+  [seed 43] epoch 1/40  train loss 1.0700  val loss nan  val MAE nan d  val rho +nan
+  [seed 43] epoch 2/40  train loss 0.3978  val loss nan  val MAE nan d  val rho +nan
+  [seed 43] epoch 3/40  train loss 0.3770  val loss nan  val MAE nan d  val rho +nan
+  [seed 43] epoch 4/40  train loss 0.3773  val loss nan  val MAE nan d  val rho +nan
+  [seed 43] epoch 5/40  train loss 0.3758  val loss nan  val MAE nan d  val rho +nan
+  [seed 43] epoch 6/40  train loss 0.3601  val loss nan  val MAE nan d  val rho +nan
+  [seed 43] epoch 7/40  train loss 0.3639  val loss nan  val MAE nan d  val rho +nan
+  [seed 43] epoch 8/40  train loss 0.3571  val loss nan  val MAE nan d  val rho +nan
+  [seed 43] test loss 0.6505  test MAE 16.400 d  test rho -0.0015
+  [seed 44] epoch 1/40  train loss 0.6640  val loss nan  val MAE nan d  val rho +nan
+  [seed 44] epoch 2/40  train loss 0.3840  val loss nan  val MAE nan d  val rho +nan
+  [seed 44] epoch 3/40  train loss 0.3480  val loss nan  val MAE nan d  val rho +nan
+  [seed 44] epoch 4/40  train loss 0.3490  val loss nan  val MAE nan d  val rho +nan
+  [seed 44] epoch 5/40  train loss 0.3481  val loss nan  val MAE nan d  val rho +nan
+  [seed 44] epoch 6/40  train loss 0.3399  val loss nan  val MAE nan d  val rho +nan
+  [seed 44] epoch 7/40  train loss 0.3457  val loss nan  val MAE nan d  val rho +nan
+  [seed 44] epoch 8/40  train loss 0.3419  val loss nan  val MAE nan d  val rho +nan
+  [seed 44] test loss 1.1274  test MAE 20.276 d  test rho -0.2530
+
+--- Floors (test set, fitted on train only) ---
+  constant (train median 12.87 d)   MAE 16.269 d
+  persistence (days-since-prev)             MAE 23.143 d   Spearman -0.4752
+  -> floor to beat                          MAE 16.269 d
+
+--- multistation[features] ---
+  per-seed MAE: ['21.025', '16.400', '20.276']  mean 19.234  spread 4.625 d
+  ENSEMBLE (mean of 3 seeds' predictions)   MAE 19.230 d   n=2394
+  skill vs floor: -0.1820   (does not beat it)
+  censored at the cap: 0.0% of test hours
+
+--- multistation[features] ensemble (fold 1/5, test set) ---
+  n                    2394
+  mae                  19.2296
+  rmse                 22.5516
+  median_ae            17.4452
+  r2                   -0.6582
+  spearman             -0.2418
+  pearson              -0.2477
+  pred_std             4.1550
+
+================================================================
+fold 2/5
+================================================================
+  purged by label span: 2,958 train and 348 val hour(s) whose next event
+      falls in a later block (61.5% of train)
+  splits (chronological): train=1853 val=2046 test=2394
+    train: median wait  12.87 d   censored   0.0%
+    val  : median wait  15.21 d   censored   0.0%
+    test : median wait   9.89 d   censored   0.0%
+
+  mean wait (d) over time (equal-width blocks):
+    2024-04-23 .. 2024-07-15  mean wait (d) 17.132  n=2013  split~train
+    2024-07-15 .. 2024-10-07  mean wait (d) 133.357  n=2014  split~train
+    2024-10-07 .. 2024-12-30  mean wait (d) 64.110  n=2013  split~val
+    2024-12-30 .. 2025-03-24  mean wait (d) 12.137  n=2014  split~val
+    2025-03-24 .. 2025-06-16  mean wait (d) 10.220  n=2014  split~test
+    2025-06-16 .. 2025-09-08  mean wait (d) 10.552  n=2013  split~-
+    2025-09-08 .. 2025-12-01  mean wait (d) 7.647  n=2014  split~-
+    2025-12-01 .. 2026-02-23  mean wait (d) 21.356  n=2013  split~-
+    2026-02-23 .. 2026-05-18  mean wait (d) 13.807  n=2014  split~-
+    2026-05-18 .. 2026-08-09  mean wait (d) nan  n=2014  split~-
+    test coverage MANT  : 100.0% of hours
+    test coverage DEMI  :  78.0% of hours
+    [stats] 1 station(s) absent for the whole training split; standardized with the identity, and masked out at every hour anyway
+  [seed 42] epoch 1/40  train loss 0.6044  val loss 1.2245  val MAE 18.949 d  val rho -0.1833
+  [seed 42] epoch 2/40  train loss 0.3779  val loss 1.2452  val MAE 19.380 d  val rho -0.2234
+  [seed 42] epoch 3/40  train loss 0.3776  val loss 1.2524  val MAE 19.220 d  val rho -0.2202
+  [seed 42] epoch 4/40  train loss 0.3654  val loss 1.2680  val MAE 19.417 d  val rho -0.2326
+  [seed 42] epoch 5/40  train loss 0.3471  val loss 1.2931  val MAE 19.481 d  val rho -0.2389
+  [seed 42] epoch 6/40  train loss 0.3567  val loss 1.3093  val MAE 19.933 d  val rho -0.2161
+  [seed 42] epoch 7/40  train loss 0.3506  val loss 1.3101  val MAE 19.495 d  val rho -0.2190
+  [seed 42] epoch 8/40  train loss 0.3517  val loss 1.3406  val MAE 19.640 d  val rho -0.2389
+  [seed 42] epoch 9/40  train loss 0.3535  val loss 1.3969  val MAE 19.961 d  val rho -0.2338
+  [seed 42] test loss 1.0473  test MAE 9.221 d  test rho +0.1860
+  [seed 43] epoch 1/40  train loss 1.0700  val loss 0.7062  val MAE 16.169 d  val rho +0.0023
+  [seed 43] epoch 2/40  train loss 0.3978  val loss 0.7072  val MAE 16.194 d  val rho -0.0140
+  [seed 43] epoch 3/40  train loss 0.3770  val loss 0.7038  val MAE 16.164 d  val rho +0.0006
+  [seed 43] epoch 4/40  train loss 0.3773  val loss 0.7134  val MAE 16.278 d  val rho +0.0007
+  [seed 43] epoch 5/40  train loss 0.3758  val loss 0.7067  val MAE 16.234 d  val rho -0.0008
+  [seed 43] epoch 6/40  train loss 0.3601  val loss 0.7112  val MAE 16.282 d  val rho -0.0013
+  [seed 43] epoch 7/40  train loss 0.3639  val loss 0.7175  val MAE 16.351 d  val rho -0.0016
+  [seed 43] epoch 8/40  train loss 0.3571  val loss 0.7061  val MAE 16.271 d  val rho -0.0049
+  [seed 43] epoch 9/40  train loss 0.3462  val loss 0.7146  val MAE 16.327 d  val rho -0.0065
+  [seed 43] epoch 10/40  train loss 0.3649  val loss 0.7081  val MAE 16.286 d  val rho -0.0066
+  [seed 43] epoch 11/40  train loss 0.3450  val loss 0.7145  val MAE 16.343 d  val rho -0.0073
+  [seed 43] test loss 0.3271  test MAE 6.356 d  test rho -0.1638
+  [seed 44] epoch 1/40  train loss 0.6640  val loss 1.0396  val MAE 18.399 d  val rho -0.2291
+  [seed 44] epoch 2/40  train loss 0.3840  val loss 1.0332  val MAE 18.928 d  val rho -0.2332
+  [seed 44] epoch 3/40  train loss 0.3480  val loss 1.0710  val MAE 19.627 d  val rho -0.2338
+  [seed 44] epoch 4/40  train loss 0.3490  val loss 1.0428  val MAE 18.746 d  val rho -0.2342
+  [seed 44] epoch 5/40  train loss 0.3481  val loss 1.0591  val MAE 19.082 d  val rho -0.2341
+  [seed 44] epoch 6/40  train loss 0.3399  val loss 1.0364  val MAE 18.906 d  val rho -0.2352
+  [seed 44] epoch 7/40  train loss 0.3457  val loss 1.0471  val MAE 19.499 d  val rho -0.2356
+  [seed 44] epoch 8/40  train loss 0.3419  val loss 1.0501  val MAE 19.144 d  val rho -0.2364
+  [seed 44] epoch 9/40  train loss 0.3316  val loss 1.0623  val MAE 19.238 d  val rho -0.2368
+  [seed 44] test loss 0.7098  test MAE 8.431 d  test rho +0.1740
+
+--- Floors (test set, fitted on train only) ---
+  constant (train median 12.87 d)   MAE 6.231 d
+  persistence (days-since-prev)             MAE 9.869 d   Spearman +0.3546
+  -> floor to beat                          MAE 6.231 d
+
+--- multistation[features] ---
+  per-seed MAE: ['9.221', '6.356', '8.431']  mean 8.002  spread 2.865 d
+  ENSEMBLE (mean of 3 seeds' predictions)   MAE 6.807 d   n=2394
+  skill vs floor: -0.0925   (does not beat it)
+  censored at the cap: 0.0% of test hours
+
+--- multistation[features] ensemble (fold 2/5, test set) ---
+  n                    2394
+  mae                  6.8071
+  rmse                 8.6055
+  median_ae            5.0224
+  r2                   -0.5129
+  spearman             0.0617
+  pearson              0.0623
+  pred_std             2.1834
+
+================================================================
+fold 3/5
+================================================================
+  purged by label span: 348 train and 73 val hour(s) whose next event
+      falls in a later block (4.8% of train)
+  splits (chronological): train=6857 val=2321 test=2394
+    train: median wait  39.49 d   censored   0.0%
+    val  : median wait  10.19 d   censored   0.0%
+    test : median wait   8.37 d   censored   0.0%
+
+  mean wait (d) over time (equal-width blocks):
+    2024-04-23 .. 2024-07-15  mean wait (d) 17.132  n=2013  split~train
+    2024-07-15 .. 2024-10-07  mean wait (d) 133.357  n=2014  split~train
+    2024-10-07 .. 2024-12-30  mean wait (d) 64.110  n=2013  split~train
+    2024-12-30 .. 2025-03-24  mean wait (d) 12.137  n=2014  split~train
+    2025-03-24 .. 2025-06-16  mean wait (d) 10.220  n=2014  split~val
+    2025-06-16 .. 2025-09-08  mean wait (d) 10.552  n=2013  split~test
+    2025-09-08 .. 2025-12-01  mean wait (d) 7.647  n=2014  split~test
+    2025-12-01 .. 2026-02-23  mean wait (d) 21.356  n=2013  split~-
+    2026-02-23 .. 2026-05-18  mean wait (d) 13.807  n=2014  split~-
+    2026-05-18 .. 2026-08-09  mean wait (d) nan  n=2014  split~-
+
+  [!] test mean wait (d) (9.893) is 0.16x train's (62.260) -- likely a swarm or quiet period concentrated in one split rather than the model generalizing. Compare against the floors below (same skew), not against a nominal baseline.
+    test coverage MANT  :  73.8% of hours
+    test coverage DEMI  :  78.9% of hours
+  [seed 42] epoch 1/40  train loss 0.8873  val loss 1.0495  val MAE 37.342 d  val rho -0.1544
+  [seed 42] epoch 2/40  train loss 0.7027  val loss 1.1162  val MAE 41.550 d  val rho -0.1858
+  [seed 42] epoch 3/40  train loss 0.6711  val loss 1.1246  val MAE 44.717 d  val rho -0.1873
+  [seed 42] epoch 4/40  train loss 0.6672  val loss 0.9960  val MAE 34.073 d  val rho -0.1958
+  [seed 42] epoch 5/40  train loss 0.6635  val loss 1.1779  val MAE 44.402 d  val rho -0.1971
+  [seed 42] epoch 6/40  train loss 0.6494  val loss 1.1380  val MAE 40.754 d  val rho -0.1808
+  [seed 42] epoch 7/40  train loss 0.6423  val loss 1.1887  val MAE 44.208 d  val rho -0.1770
+  [seed 42] epoch 8/40  train loss 0.6404  val loss 1.0504  val MAE 35.697 d  val rho -0.1860
+  [seed 42] epoch 9/40  train loss 0.6323  val loss 1.1787  val MAE 41.894 d  val rho -0.1715
+  [seed 42] epoch 10/40  train loss 0.6322  val loss 1.1284  val MAE 39.622 d  val rho -0.1789
+  [seed 42] epoch 11/40  train loss 0.6241  val loss 1.1554  val MAE 38.792 d  val rho -0.1853
+  [seed 42] epoch 12/40  train loss 0.6157  val loss 1.1443  val MAE 39.505 d  val rho -0.1655
+  [seed 42] test loss 1.3236  test MAE 43.746 d  test rho -0.0321
+  [seed 43] epoch 1/40  train loss 1.1573  val loss 0.8673  val MAE 23.302 d  val rho -0.2609
+  [seed 43] epoch 2/40  train loss 0.8165  val loss 1.0517  val MAE 30.947 d  val rho -0.2814
+  [seed 43] epoch 3/40  train loss 0.8092  val loss 0.9072  val MAE 24.089 d  val rho -0.3121
+  [seed 43] epoch 4/40  train loss 0.7729  val loss 0.8935  val MAE 23.137 d  val rho -0.2344
+  [seed 43] epoch 5/40  train loss 0.7331  val loss 1.1293  val MAE 34.892 d  val rho -0.2135
+  [seed 43] epoch 6/40  train loss 0.7276  val loss 1.1209  val MAE 35.106 d  val rho -0.2105
+  [seed 43] epoch 7/40  train loss 0.7108  val loss 0.9214  val MAE 26.009 d  val rho -0.2151
+  [seed 43] epoch 8/40  train loss 0.7007  val loss 1.0073  val MAE 30.482 d  val rho -0.2151
+  [seed 43] epoch 9/40  train loss 0.6840  val loss 0.7913  val MAE 20.705 d  val rho -0.2141
+  [seed 43] epoch 10/40  train loss 0.6769  val loss 0.9948  val MAE 30.131 d  val rho -0.2050
+  [seed 43] epoch 11/40  train loss 0.6641  val loss 1.1076  val MAE 35.967 d  val rho -0.2139
+  [seed 43] epoch 12/40  train loss 0.6615  val loss 1.0810  val MAE 34.901 d  val rho -0.2088
+  [seed 43] epoch 13/40  train loss 0.6600  val loss 1.0451  val MAE 32.656 d  val rho -0.2214
+  [seed 43] epoch 14/40  train loss 0.6508  val loss 1.0878  val MAE 34.930 d  val rho -0.2141
+  [seed 43] epoch 15/40  train loss 0.6500  val loss 1.2304  val MAE 42.350 d  val rho -0.2205
+  [seed 43] epoch 16/40  train loss 0.6522  val loss 1.3226  val MAE 48.109 d  val rho -0.2116
+  [seed 43] epoch 17/40  train loss 0.6475  val loss 1.1373  val MAE 37.073 d  val rho -0.2232
+  [seed 43] test loss 1.0184  test MAE 27.220 d  test rho +0.0468
+  [seed 44] epoch 1/40  train loss 0.9024  val loss 1.0453  val MAE 36.643 d  val rho -0.1945
+  [seed 44] epoch 2/40  train loss 0.6740  val loss 1.1662  val MAE 42.780 d  val rho -0.2486
+  [seed 44] epoch 3/40  train loss 0.6685  val loss 0.9762  val MAE 31.494 d  val rho -0.2346
+  [seed 44] epoch 4/40  train loss 0.6531  val loss 0.9978  val MAE 32.760 d  val rho -0.2307
+  [seed 44] epoch 5/40  train loss 0.6395  val loss 1.0675  val MAE 35.691 d  val rho -0.2310
+  [seed 44] epoch 6/40  train loss 0.6514  val loss 1.0477  val MAE 36.142 d  val rho -0.2294
+  [seed 44] epoch 7/40  train loss 0.6383  val loss 0.9761  val MAE 30.433 d  val rho -0.2327
+  [seed 44] epoch 8/40  train loss 0.6394  val loss 1.0543  val MAE 34.532 d  val rho -0.2363
+  [seed 44] epoch 9/40  train loss 0.6277  val loss 1.0725  val MAE 36.541 d  val rho -0.2355
+  [seed 44] epoch 10/40  train loss 0.6274  val loss 1.0354  val MAE 34.033 d  val rho -0.2345
+  [seed 44] epoch 11/40  train loss 0.6291  val loss 1.0455  val MAE 34.764 d  val rho -0.2337
+  [seed 44] epoch 12/40  train loss 0.6201  val loss 1.1566  val MAE 40.670 d  val rho -0.2381
+  [seed 44] epoch 13/40  train loss 0.6163  val loss 1.0090  val MAE 32.471 d  val rho -0.2308
+  [seed 44] epoch 14/40  train loss 0.6067  val loss 1.2033  val MAE 42.794 d  val rho -0.2464
+  [seed 44] epoch 15/40  train loss 0.6033  val loss 1.1832  val MAE 42.428 d  val rho -0.2452
+  [seed 44] test loss 1.3289  test MAE 41.865 d  test rho -0.0179
+
+--- Floors (test set, fitted on train only) ---
+  constant (train median 39.49 d)   MAE 29.592 d
+  persistence (days-since-prev)             MAE 11.506 d   Spearman -0.1037
+  -> floor to beat                          MAE 11.506 d
+
+--- multistation[features] ---
+  per-seed MAE: ['43.746', '27.220', '41.865']  mean 37.610  spread 16.526 d
+  ENSEMBLE (mean of 3 seeds' predictions)   MAE 37.529 d   n=2394
+  skill vs floor: -2.2616   (does not beat it)
+  censored at the cap: 0.0% of test hours
+
+--- multistation[features] ensemble (fold 3/5, test set) ---
+  n                    2394
+  mae                  37.5289
+  rmse                 41.8521
+  median_ae            37.5534
+  r2                   -28.6448
+  spearman             -0.0126
+  pearson              -0.0662
+  pred_std             16.7110
+
+================================================================
+fold 4/5
+================================================================
+  purged by label span: 73 train and 0 val hour(s) whose next event
+      falls in a later block (0.8% of train)
+  splits (chronological): train=9526 val=2394 test=2394
+    train: median wait  22.15 d   censored   0.0%
+    val  : median wait   8.37 d   censored   0.0%
+    test : median wait   7.35 d   censored   0.0%
+
+  mean wait (d) over time (equal-width blocks):
+    2024-04-23 .. 2024-07-15  mean wait (d) 17.132  n=2013  split~train
+    2024-07-15 .. 2024-10-07  mean wait (d) 133.357  n=2014  split~train
+    2024-10-07 .. 2024-12-30  mean wait (d) 64.110  n=2013  split~train
+    2024-12-30 .. 2025-03-24  mean wait (d) 12.137  n=2014  split~train
+    2025-03-24 .. 2025-06-16  mean wait (d) 10.220  n=2014  split~train
+    2025-06-16 .. 2025-09-08  mean wait (d) 10.552  n=2013  split~val
+    2025-09-08 .. 2025-12-01  mean wait (d) 7.647  n=2014  split~test
+    2025-12-01 .. 2026-02-23  mean wait (d) 21.356  n=2013  split~test
+    2026-02-23 .. 2026-05-18  mean wait (d) 13.807  n=2014  split~-
+    2026-05-18 .. 2026-08-09  mean wait (d) nan  n=2014  split~-
+
+  [!] test mean wait (d) (12.415) is 0.26x train's (48.568) -- likely a swarm or quiet period concentrated in one split rather than the model generalizing. Compare against the floors below (same skew), not against a nominal baseline.
+    test coverage MANT  :  84.2% of hours
+    test coverage DEMI  :  78.9% of hours
+  [seed 42] epoch 1/40  train loss 0.8140  val loss 0.9476  val MAE 24.448 d  val rho -0.1272
+  [seed 42] epoch 2/40  train loss 0.6979  val loss 0.9595  val MAE 25.106 d  val rho -0.1395
+  [seed 42] epoch 3/40  train loss 0.6868  val loss 0.9125  val MAE 24.131 d  val rho -0.1317
+  [seed 42] epoch 4/40  train loss 0.6722  val loss 0.9389  val MAE 25.597 d  val rho -0.1317
+  [seed 42] epoch 5/40  train loss 0.6608  val loss 1.0755  val MAE 33.121 d  val rho -0.1225
+  [seed 42] epoch 6/40  train loss 0.6397  val loss 1.0031  val MAE 29.114 d  val rho -0.1454
+  [seed 42] epoch 7/40  train loss 0.6330  val loss 1.1357  val MAE 35.589 d  val rho -0.1558
+  [seed 42] epoch 8/40  train loss 0.6251  val loss 1.1251  val MAE 34.425 d  val rho -0.1473
+  [seed 42] epoch 9/40  train loss 0.6242  val loss 1.0113  val MAE 29.052 d  val rho -0.1422
+  [seed 42] epoch 10/40  train loss 0.6186  val loss 1.0020  val MAE 28.599 d  val rho -0.1538
+  [seed 42] epoch 11/40  train loss 0.6186  val loss 1.0774  val MAE 30.552 d  val rho -0.1408
+  [seed 42] test loss 1.0905  test MAE 26.813 d  test rho -0.4140
+  [seed 43] epoch 1/40  train loss 0.9807  val loss 0.6283  val MAE 12.089 d  val rho +0.2032
+  [seed 43] epoch 2/40  train loss 0.7798  val loss 0.6831  val MAE 13.567 d  val rho +0.1993
+  [seed 43] epoch 3/40  train loss 0.7707  val loss 0.7818  val MAE 16.484 d  val rho +0.1736
+  [seed 43] epoch 4/40  train loss 0.7691  val loss 0.7423  val MAE 15.292 d  val rho +0.1250
+  [seed 43] epoch 5/40  train loss 0.7702  val loss 0.6990  val MAE 14.062 d  val rho +0.0824
+  [seed 43] epoch 6/40  train loss 0.7556  val loss 0.6885  val MAE 13.961 d  val rho +0.0175
+  [seed 43] epoch 7/40  train loss 0.7510  val loss 0.9199  val MAE 21.833 d  val rho +0.0277
+  [seed 43] epoch 8/40  train loss 0.7327  val loss 0.7640  val MAE 17.952 d  val rho +0.0126
+  [seed 43] epoch 9/40  train loss 0.7089  val loss 0.8765  val MAE 23.003 d  val rho +0.0078
+  [seed 43] test loss 0.7432  test MAE 13.223 d  test rho +0.1852
+  [seed 44] epoch 1/40  train loss 0.8227  val loss 1.0721  val MAE 30.347 d  val rho -0.1506
+  [seed 44] epoch 2/40  train loss 0.7016  val loss 0.9914  val MAE 25.883 d  val rho -0.1159
+  [seed 44] epoch 3/40  train loss 0.6869  val loss 1.0542  val MAE 28.708 d  val rho -0.0722
+  [seed 44] epoch 4/40  train loss 0.6824  val loss 1.2048  val MAE 36.910 d  val rho -0.0970
+  [seed 44] epoch 5/40  train loss 0.6722  val loss 0.9544  val MAE 24.888 d  val rho -0.0566
+  [seed 44] epoch 6/40  train loss 0.6681  val loss 0.9653  val MAE 25.825 d  val rho -0.1081
+  [seed 44] epoch 7/40  train loss 0.6629  val loss 0.9963  val MAE 27.989 d  val rho -0.0582
+  [seed 44] epoch 8/40  train loss 0.6565  val loss 1.0849  val MAE 31.999 d  val rho -0.0676
+  [seed 44] epoch 9/40  train loss 0.6517  val loss 0.9575  val MAE 26.495 d  val rho -0.0504
+  [seed 44] epoch 10/40  train loss 0.6384  val loss 1.0247  val MAE 29.818 d  val rho -0.0274
+  [seed 44] epoch 11/40  train loss 0.6203  val loss 1.0132  val MAE 30.004 d  val rho -0.0534
+  [seed 44] epoch 12/40  train loss 0.6244  val loss 1.0236  val MAE 30.696 d  val rho -0.0942
+  [seed 44] epoch 13/40  train loss 0.6170  val loss 0.9713  val MAE 26.803 d  val rho -0.0954
+  [seed 44] test loss 1.1016  test MAE 28.574 d  test rho -0.3490
+
+--- Floors (test set, fitted on train only) ---
+  constant (train median 22.15 d)   MAE 13.782 d
+  persistence (days-since-prev)             MAE 10.742 d   Spearman +0.0175
+  -> floor to beat                          MAE 10.742 d
+
+--- multistation[features] ---
+  per-seed MAE: ['26.813', '13.223', '28.574']  mean 22.870  spread 15.351 d
+  ENSEMBLE (mean of 3 seeds' predictions)   MAE 22.619 d   n=2394
+  skill vs floor: -1.1056   (does not beat it)
+  censored at the cap: 0.0% of test hours
+
+--- multistation[features] ensemble (fold 4/5, test set) ---
+  n                    2394
+  mae                  22.6193
+  rmse                 27.6373
+  median_ae            19.1233
+  r2                   -4.4636
+  spearman             -0.3808
+  pearson              -0.3380
+  pred_std             13.3475
+
+================================================================
+fold 5/5
+================================================================
+  purged by label span: 0 train and 494 val hour(s) whose next event
+      falls in a later block (0.0% of train)
+  splits (chronological): train=11993 val=1900 test=2394
+    train: median wait  16.55 d   censored   0.0%
+    val  : median wait   4.92 d   censored   0.0%
+    test : median wait  15.87 d   censored   0.0%
+
+  mean wait (d) over time (equal-width blocks):
+    2024-04-23 .. 2024-07-15  mean wait (d) 17.132  n=2013  split~train
+    2024-07-15 .. 2024-10-07  mean wait (d) 133.357  n=2014  split~train
+    2024-10-07 .. 2024-12-30  mean wait (d) 64.110  n=2013  split~train
+    2024-12-30 .. 2025-03-24  mean wait (d) 12.137  n=2014  split~train
+    2025-03-24 .. 2025-06-16  mean wait (d) 10.220  n=2014  split~train
+    2025-06-16 .. 2025-09-08  mean wait (d) 10.552  n=2013  split~train
+    2025-09-08 .. 2025-12-01  mean wait (d) 7.647  n=2014  split~val
+    2025-12-01 .. 2026-02-23  mean wait (d) 21.356  n=2013  split~test
+    2026-02-23 .. 2026-05-18  mean wait (d) 13.807  n=2014  split~test
+    2026-05-18 .. 2026-08-09  mean wait (d) nan  n=2014  split~-
+
+  [!] test mean wait (d) (17.424) is 0.43x train's (40.606) -- likely a swarm or quiet period concentrated in one split rather than the model generalizing. Compare against the floors below (same skew), not against a nominal baseline.
+    test coverage MANT  :  59.7% of hours
+    test coverage DEMI  :  78.9% of hours
+  [seed 42] epoch 1/40  train loss 0.7732  val loss 0.7852  val MAE 13.052 d  val rho -0.1016
+  [seed 42] epoch 2/40  train loss 0.6975  val loss 0.8690  val MAE 16.533 d  val rho -0.1101
+  [seed 42] epoch 3/40  train loss 0.6893  val loss 0.7967  val MAE 14.696 d  val rho -0.1175
+  [seed 42] epoch 4/40  train loss 0.6800  val loss 0.8717  val MAE 16.511 d  val rho -0.1104
+  [seed 42] epoch 5/40  train loss 0.6784  val loss 0.8669  val MAE 15.898 d  val rho -0.1055
+  [seed 42] epoch 6/40  train loss 0.6727  val loss 1.0206  val MAE 19.535 d  val rho -0.1254
+  [seed 42] epoch 7/40  train loss 0.6691  val loss 0.8112  val MAE 13.588 d  val rho -0.1537
+  [seed 42] epoch 8/40  train loss 0.6623  val loss 1.0434  val MAE 19.885 d  val rho -0.2542
+  [seed 42] epoch 9/40  train loss 0.6479  val loss 1.1378  val MAE 23.347 d  val rho -0.2292
+  [seed 42] test loss 0.3763  test MAE 10.862 d  test rho +0.0141
+  [seed 43] epoch 1/40  train loss 0.8698  val loss 0.8042  val MAE 11.687 d  val rho -0.0494
+  [seed 43] epoch 2/40  train loss 0.7403  val loss 0.7124  val MAE 9.914 d  val rho +0.0260
+  [seed 43] epoch 3/40  train loss 0.7397  val loss 0.7308  val MAE 10.211 d  val rho +0.0483
+  [seed 43] epoch 4/40  train loss 0.7326  val loss 0.9030  val MAE 14.127 d  val rho +0.0493
+  [seed 43] epoch 5/40  train loss 0.7212  val loss 0.7026  val MAE 9.733 d  val rho +0.0602
+  [seed 43] epoch 6/40  train loss 0.7182  val loss 0.6826  val MAE 9.448 d  val rho +0.0823
+  [seed 43] epoch 7/40  train loss 0.7086  val loss 0.7205  val MAE 10.337 d  val rho +0.1232
+  [seed 43] epoch 8/40  train loss 0.6941  val loss 0.6663  val MAE 9.510 d  val rho +0.1166
+  [seed 43] epoch 9/40  train loss 0.6848  val loss 0.6694  val MAE 9.537 d  val rho +0.1112
+  [seed 43] epoch 10/40  train loss 0.6862  val loss 0.7609  val MAE 11.491 d  val rho +0.1080
+  [seed 43] epoch 11/40  train loss 0.6843  val loss 0.6502  val MAE 9.049 d  val rho +0.0973
+  [seed 43] epoch 12/40  train loss 0.6764  val loss 0.8212  val MAE 12.854 d  val rho +0.0882
+  [seed 43] epoch 13/40  train loss 0.6730  val loss 0.7442  val MAE 10.919 d  val rho +0.0766
+  [seed 43] epoch 14/40  train loss 0.6721  val loss 0.7468  val MAE 10.955 d  val rho +0.0534
+  [seed 43] epoch 15/40  train loss 0.6727  val loss 0.8795  val MAE 13.980 d  val rho +0.0233
+  [seed 43] epoch 16/40  train loss 0.6641  val loss 0.7892  val MAE 11.870 d  val rho +0.0117
+  [seed 43] epoch 17/40  train loss 0.6642  val loss 0.7899  val MAE 11.967 d  val rho +0.0060
+  [seed 43] epoch 18/40  train loss 0.6633  val loss 0.7223  val MAE 10.934 d  val rho -0.0018
+  [seed 43] epoch 19/40  train loss 0.6651  val loss 0.9141  val MAE 14.941 d  val rho +0.0078
+  [seed 43] test loss 0.4092  test MAE 10.797 d  test rho -0.1600
+  [seed 44] epoch 1/40  train loss 0.7924  val loss 0.7935  val MAE 11.781 d  val rho -0.1126
+  [seed 44] epoch 2/40  train loss 0.7197  val loss 0.7537  val MAE 12.336 d  val rho -0.0622
+  [seed 44] epoch 3/40  train loss 0.7080  val loss 0.8772  val MAE 16.628 d  val rho -0.0713
+  [seed 44] epoch 4/40  train loss 0.6946  val loss 0.7058  val MAE 11.945 d  val rho -0.1043
+  [seed 44] epoch 5/40  train loss 0.6876  val loss 0.9325  val MAE 20.187 d  val rho -0.1077
+  [seed 44] epoch 6/40  train loss 0.6777  val loss 0.7514  val MAE 13.705 d  val rho -0.1214
+  [seed 44] epoch 7/40  train loss 0.6696  val loss 0.8551  val MAE 17.476 d  val rho -0.1139
+  [seed 44] epoch 8/40  train loss 0.6597  val loss 0.7805  val MAE 13.942 d  val rho -0.1406
+  [seed 44] epoch 9/40  train loss 0.6533  val loss 0.7898  val MAE 13.959 d  val rho -0.1453
+  [seed 44] test loss 0.3546  test MAE 10.196 d  test rho +0.0297
+
+--- Floors (test set, fitted on train only) ---
+  constant (train median 16.55 d)   MAE 9.813 d
+  persistence (days-since-prev)             MAE 23.747 d   Spearman +0.2328
+  -> floor to beat                          MAE 9.813 d
+
+--- multistation[features] ---
+  per-seed MAE: ['10.862', '10.797', '10.196']  mean 10.619  spread 0.666 d
+  ENSEMBLE (mean of 3 seeds' predictions)   MAE 10.443 d   n=2394
+  skill vs floor: -0.0641   (does not beat it)
+  censored at the cap: 0.0% of test hours
+
+--- multistation[features] ensemble (fold 5/5, test set) ---
+  n                    2394
+  mae                  10.4425
+  rmse                 12.9681
+  median_ae            9.9145
+  r2                   -0.2189
+  spearman             -0.1098
+  pearson              -0.1046
+  pred_std             3.1367
+
+================================================================
+Walk-forward CV summary (5/5 folds, regression)
+================================================================
+  ensemble MAE per fold: ['19.230', '6.807', '37.529', '22.619', '10.443'] d
+  ensemble MAE:  mean 19.325  std 10.750 d
+  floor MAE:     mean 10.912  std 3.231 d
+  Spearman per fold:   ['-0.2418', '+0.0617', '-0.0126', '-0.3808', '-0.1098']
+  persistence Spearman:['-0.4752', '+0.3546', '-0.1037', '+0.0175', '+0.2328']
+  beats its own fold's floor in 0/5 folds
+  [!] persistence orders the hours better in 3/5 fold(s). A lower MAE than the
+      constant floor does not make up for that -- the constant orders nothing at all.
+  [!] fold spread exceeds the margin over the floor -- read the per-fold column,
+      not the mean. This is the condition under which a pooled number misleads.
